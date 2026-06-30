@@ -23,6 +23,7 @@ app.set('trust proxy', 1);
 app.use(correlationIdMiddleware);
 app.use(requestLogger);
 app.use(helmet(helmetOptions));
+app.use(cors(corsOptions));
 app.use(compression());
 app.use(apiRateLimit);
 app.use(contentTypeGuard);
