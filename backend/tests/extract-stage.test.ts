@@ -220,6 +220,80 @@ describe('Phase 3 extraction pipeline', () => {
     ]);
   });
 
+  it('keeps resume experience bullets attached to the correct job instead of treating them as employers', async () => {
+    const stage = new ExtractStage();
+
+    const [candidate] = await stage.execute([
+      createSource({
+        fileName: 'aditya-resume.txt',
+        mimeType: 'text/plain',
+        sourceType: 'resume',
+        sourceName: 'Resume Upload',
+        buffer: Buffer.from(
+          [
+            'ADITYA COOMAR',
+            '+91 79035 50110 ⋄ Chennai, Tamil Nadu',
+            'adi.coomar04@gmail.com ⋄ linkedin.com/in/aditya-coomar ⋄ github.com/Aditya-Coomar',
+            'EDUCATION',
+            'B. Tech in Computer Science and Engineering, SRM Institute of Science and Technology Expected 2027',
+            'GPA: 9.85',
+            'SKILLS',
+            'Technical Stack: React.js, Next.js, TypeScript, Node.js',
+            'Tools: Docker, Git/GitHub, Postman',
+            'WORK EXPERIENCE',
+            'Bajaj Finserv Health Limited June 2025 - Aug 2025',
+            'SDE Intern Pune, Mahrashtra, India',
+            '- Built and delivered a production-ready Visitor Management System.',
+            '- Optimized frontend performance and added image compression.',
+            'Reflow Technologies Sept 2024 - April 2025',
+            'Web Development Hybrid',
+            '- Worked with a team of 3 to develop a User Dashboard.',
+            'IBM Oct 2021',
+            'Intern Remote',
+            '- Gained comprehensive insights into product development.',
+            'PROJECTS',
+            'Campus Web',
+          ].join('\n'),
+        ),
+      }),
+    ]);
+
+    expect(candidate?.headline).toBeUndefined();
+    expect(candidate?.location?.city).toBe('Chennai');
+    expect(candidate?.socialLinks.map((link) => link.platform)).toEqual([
+      'linkedin',
+      'github',
+    ]);
+    expect(candidate?.skills.map((skill) => skill.name)).toEqual([
+      'React.js',
+      'Next.js',
+      'TypeScript',
+      'Node.js',
+      'Docker',
+      'Git/GitHub',
+      'Postman',
+    ]);
+    expect(candidate?.experiences.map((experience) => experience.employer)).toEqual([
+      'Bajaj Finserv Health Limited',
+      'Reflow Technologies',
+      'IBM',
+    ]);
+    expect(candidate?.experiences[0]?.title).toBe('SDE Intern');
+    expect(candidate?.experiences[0]?.description).toContain(
+      'Built and delivered a production-ready Visitor Management System.',
+    );
+    expect(candidate?.experiences[0]?.description).toContain(
+      'Optimized frontend performance',
+    );
+    expect(candidate?.education).toHaveLength(1);
+    expect(candidate?.education[0]).toMatchObject({
+      institution: 'SRM Institute of Science and Technology',
+      degree: 'B. Tech',
+      fieldOfStudy: 'Computer Science and Engineering',
+      endDate: '2027-01',
+    });
+  });
+
   it('extract stage processes ATS JSON sources', async () => {
     const stage = new ExtractStage();
 

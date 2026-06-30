@@ -267,6 +267,8 @@ export class ExtractStage {
         'Enrich the extracted candidate using only grounded source evidence.',
         'Prefer filling missing fields over changing existing ones.',
         'Never invent companies, dates, degrees, locations, or skills.',
+        'For experience, return one item per actual job only. A valid experience employer must be an organization name from a job header, not a bullet, achievement, wrapped continuation line, project sentence, or responsibility.',
+        'Attach bullets and wrapped continuation lines to that job description; never emit them as employers.',
         JSON.stringify({
           candidate,
           parsedContent,
@@ -296,16 +298,18 @@ export class ExtractStage {
       experiences:
         candidate.experiences.length > 0
           ? candidate.experiences
-          : response.data.experiences.map((experience) =>
-              createExperience({
-                employer: experience.employer,
-                title: experience.title,
-                description: experience.description,
-                startDate: experience.startDate,
-                endDate: experience.endDate,
-                isCurrent: experience.isCurrent ?? false,
-              }),
-            ),
+          : response.data.experiences
+              .filter(isUsableLlmExperience)
+              .map((experience) =>
+                createExperience({
+                  employer: experience.employer,
+                  title: experience.title,
+                  description: experience.description,
+                  startDate: experience.startDate,
+                  endDate: experience.endDate,
+                  isCurrent: experience.isCurrent ?? false,
+                }),
+              ),
       education:
         candidate.education.length > 0
           ? candidate.education
@@ -320,6 +324,20 @@ export class ExtractStage {
             ),
     });
   }
+}
+
+function isUsableLlmExperience(
+  experience: z.infer<typeof extractionRefinementSchema>['experiences'][number],
+): boolean {
+  const employer = experience.employer.trim();
+
+  return (
+    employer.length > 1 &&
+    employer.length <= 120 &&
+    !/^[•*-]|^â€¢/.test(employer) &&
+    !/[.!?]$/.test(employer) &&
+    !/^(shipped|and|low-|needs|users|export|design|worked|gained|developed|built|optimized|researched|collaborated)\b/i.test(employer)
+  );
 }
 
 function buildSourceEvidence(
