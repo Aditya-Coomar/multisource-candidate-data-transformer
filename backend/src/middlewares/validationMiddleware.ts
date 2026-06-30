@@ -3,6 +3,7 @@ import { ZodError } from 'zod';
 import { RequestValidationError, UploadError } from '../errors';
 import type { AppRequest } from '../types/http';
 import { projectionConfigSchema } from '../types/schemas';
+import { parseProjectionConfigOrDefault } from '../utils/validators';
 import {
   transformRequestSchema,
   validateConfigRequestSchema,
@@ -23,6 +24,18 @@ function parseJsonField(value: unknown, field: string): unknown {
   }
 }
 
+function parseProjectionConfigField(value: unknown): unknown {
+  if (typeof value !== 'string') {
+    return value;
+  }
+
+  try {
+    return JSON.parse(value);
+  } catch {
+    return undefined;
+  }
+}
+
 export function validateTransformRequest(
   req: AppRequest,
   _res: Response,
@@ -39,7 +52,7 @@ export function validateTransformRequest(
     }
 
     const parsedBody = transformRequestSchema.parse({
-      projectionConfig: parseJsonField(req.body.projectionConfig, 'projectionConfig'),
+      projectionConfig: parseProjectionConfigField(req.body.projectionConfig),
       sources: req.body.sources
         ? parseJsonField(req.body.sources, 'sources')
         : undefined,
@@ -50,7 +63,7 @@ export function validateTransformRequest(
 
     req.body = {
       ...req.body,
-      projectionConfig: projectionConfigSchema.parse(parsedBody.projectionConfig),
+      projectionConfig: parseProjectionConfigOrDefault(parsedBody.projectionConfig),
       sources: parsedBody.sources ?? [],
       llm: parsedBody.llm,
     };

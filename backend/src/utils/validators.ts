@@ -130,3 +130,17 @@ export function validateProjectionConfig(payload: unknown): ProjectionConfig {
     'ProjectionConfig',
   );
 }
+
+export function parseProjectionConfigOrDefault(payload: unknown): ProjectionConfig {
+  const result = projectionConfigSchema.safeParse(payload ?? {});
+
+  if (result.success) {
+    return result.data;
+  }
+
+  logger.warn('projection.config.defaulted', {
+    issues: result.error.flatten(),
+  });
+
+  return validateProjectionConfig({});
+}

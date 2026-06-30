@@ -11,7 +11,10 @@ import {
   transformResponseDataSchema,
   validateProjectedCandidates,
 } from '../validators/response/transform.response';
-import { validateProjectionConfig } from '../utils/validators';
+import {
+  parseProjectionConfigOrDefault,
+  validateProjectionConfig,
+} from '../utils/validators';
 import {
   ConfidenceStage,
   ExtractStage,
@@ -81,7 +84,9 @@ export class PipelineService {
 
   async transform(input: TransformInput): Promise<TransformResult> {
     try {
-      const projectionConfig = validateProjectionConfig(input.projectionConfig);
+      const projectionConfig = parseProjectionConfigOrDefault(
+        input.projectionConfig,
+      );
       const sources = this.mapFilesToSources(
         input.files,
         input.sourceDescriptors ?? [],

@@ -106,6 +106,75 @@ describe('Phase 8 validation engine and REST API layer', () => {
     });
   });
 
+  it('uses the default assignment schema when projectionConfig is omitted', async () => {
+    const response = await request(app)
+      .post('/api/v1/transform')
+      .attach('files', Buffer.from(
+        [
+          'Jane Doe',
+          'Senior Backend Engineer',
+          'jane@example.com',
+          '+1 555 111 2222',
+          'SKILLS',
+          'TypeScript, Node.js',
+        ].join('\n'),
+      ), {
+        filename: 'resume.txt',
+        contentType: 'text/plain',
+      });
+
+    expect(response.status).toBe(200);
+    expect(Object.keys(response.body.data.candidates[0])).toEqual([
+      'candidate_id',
+      'full_name',
+      'emails',
+      'phones',
+      'location',
+      'links',
+      'headline',
+      'years_experience',
+      'skills',
+      'experience',
+      'education',
+      'provenance',
+      'overall_confidence',
+    ]);
+    expect(response.body.data.candidates[0]).toMatchObject({
+      full_name: 'Jane Doe',
+      emails: ['jane@example.com'],
+      phones: ['+15551112222'],
+      headline: 'Senior Backend Engineer',
+    });
+  });
+
+  it('falls back to the default assignment schema when projectionConfig is malformed', async () => {
+    const response = await request(app)
+      .post('/api/v1/transform')
+      .field('projectionConfig', '{broken-json')
+      .attach('files', Buffer.from(
+        [
+          'Jane Doe',
+          'Senior Backend Engineer',
+          'jane@example.com',
+          '+1 555 111 2222',
+          'SKILLS',
+          'TypeScript, Node.js',
+        ].join('\n'),
+      ), {
+        filename: 'resume.txt',
+        contentType: 'text/plain',
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body.data.candidates[0]).toMatchObject({
+      candidate_id: expect.any(String),
+      full_name: 'Jane Doe',
+      emails: ['jane@example.com'],
+      phones: ['+15551112222'],
+      overall_confidence: expect.any(Number),
+    });
+  });
+
   it('rejects transform requests without files', async () => {
     const response = await request(app)
       .post('/api/v1/transform')
