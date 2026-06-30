@@ -5,5 +5,6 @@ export * from './models';
 export * from './normalizers';
 export * from './parsers';
 export * from './pipeline';
+export * from './projectors';
 export * from './types';
 export * from './utils/validators';

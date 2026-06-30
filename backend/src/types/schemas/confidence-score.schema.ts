@@ -9,5 +9,11 @@ export const confidenceScoreSchema = z
     reason: z.string().min(1).optional(),
     sourceRecordId: uuidSchema.optional(),
     calculatedAt: isoDateStringSchema.optional(),
+    strategy: z.string().min(1).optional(),
+    sourceWeight: z.number().min(0).max(1).optional(),
+    agreementScore: z.number().min(0).max(1).optional(),
+    completenessScore: z.number().min(0).max(1).optional(),
+    validationScore: z.number().min(0).max(1).optional(),
+    fieldWeight: z.number().min(0).optional(),
   })
   .passthrough();

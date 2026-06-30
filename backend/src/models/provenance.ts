@@ -10,6 +10,13 @@ export interface Provenance extends IdentifiableEntity {
   readonly extractedValue?: string;
   readonly extractor?: string;
   readonly notes?: string;
+  readonly originalValue?: string;
+  readonly normalizedValue?: string;
+  readonly selectedValue?: string;
+  readonly sourceName?: string;
+  readonly sourcePriority?: number;
+  readonly normalizer?: string;
+  readonly timestamp?: string;
   readonly winningSourceRecordIds?: readonly string[];
   readonly candidateSourceRecordIds?: readonly string[];
   readonly mergeStrategy?: string;
@@ -27,9 +34,16 @@ export function createProvenance(
     id: input.id ?? randomUUID(),
     sourceRecordId: input.sourceRecordId,
     fieldPath: input.fieldPath,
-    extractedValue: input.extractedValue,
-    extractor: input.extractor,
-    notes: input.notes,
+    extractedValue: sanitizeOptionalText(input.extractedValue),
+    extractor: sanitizeOptionalText(input.extractor),
+    notes: sanitizeOptionalText(input.notes),
+    originalValue: sanitizeOptionalText(input.originalValue),
+    normalizedValue: sanitizeOptionalText(input.normalizedValue),
+    selectedValue: sanitizeOptionalText(input.selectedValue),
+    sourceName: sanitizeOptionalText(input.sourceName),
+    sourcePriority: input.sourcePriority,
+    normalizer: sanitizeOptionalText(input.normalizer),
+    timestamp: input.timestamp,
     winningSourceRecordIds: input.winningSourceRecordIds
       ? Object.freeze([...(input.winningSourceRecordIds ?? [])])
       : undefined,
@@ -42,4 +56,13 @@ export function createProvenance(
       : undefined,
     resolvedAt: input.resolvedAt,
   });
+}
+
+function sanitizeOptionalText(value: string | undefined): string | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  const trimmed = value.trim();
+  return trimmed ? value : undefined;
 }

@@ -1,3 +1,4 @@
+export * from './candidate-metadata.schema';
 export * from './canonical-candidate.schema';
 export * from './common.schema';
 export * from './confidence-score.schema';

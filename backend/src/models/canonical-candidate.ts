@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { CandidateAggregate } from '../interfaces/candidate.interface';
+import type { CandidateMetadata } from './candidate-metadata';
 import type { ContactInfo } from './contact-info';
 import type { Education } from './education';
 import type { Experience } from './experience';
@@ -25,6 +26,7 @@ export interface CanonicalCandidate extends CandidateAggregate {
   readonly skills: readonly Skill[];
   readonly tags: readonly string[];
   readonly additionalData: Readonly<Record<string, unknown>>;
+  readonly candidateMetadata?: CandidateMetadata;
   readonly createdAt: string;
   readonly updatedAt: string;
 }
@@ -56,6 +58,7 @@ export function createCanonicalCandidate(
     confidence: Object.freeze([...(input.confidence ?? [])]),
     tags: Object.freeze([...(input.tags ?? [])]),
     additionalData: Object.freeze({ ...(input.additionalData ?? {}) }),
+    candidateMetadata: input.candidateMetadata,
     createdAt: input.createdAt ?? timestamp,
     updatedAt: input.updatedAt ?? timestamp,
   });

@@ -15,6 +15,8 @@ const envSchema = z.object({
   CORS_ORIGINS: z.string().optional(),
   MERGE_SOURCE_PRIORITY: z.string().optional(),
   MERGE_IDENTITY_FALLBACK_ENABLED: z.coerce.boolean().default(true),
+  CONFIDENCE_SOURCE_WEIGHTS: z.string().optional(),
+  CONFIDENCE_FIELD_WEIGHTS: z.string().optional(),
 });
 
 const parsedEnv = envSchema.safeParse(process.env);
@@ -61,6 +63,61 @@ const defaultMergeSourceMatchers = {
   other: ['other'],
 } as const;
 
+const defaultConfidenceSourceWeights = {
+  resume: 1,
+  ats: 0.95,
+  csv: 0.9,
+  github: 0.85,
+  linkedin: 0.85,
+  'recruiter-notes': 0.7,
+  'job-board': 0.8,
+  'social-profile': 0.8,
+  manual: 0.75,
+  other: 0.7,
+} as const;
+
+const defaultConfidenceFieldWeights = {
+  firstName: 0.8,
+  middleName: 0.4,
+  lastName: 0.8,
+  fullName: 1,
+  headline: 0.5,
+  summary: 0.35,
+  location: 0.7,
+  contactInfo: 1,
+  socialLinks: 0.7,
+  experiences: 0.9,
+  education: 0.75,
+  skills: 0.85,
+  tags: 0.25,
+  additionalData: 0.3,
+} as const;
+
+function parseNumericConfig(
+  rawValue: string | undefined,
+  defaults: Readonly<Record<string, number>>,
+): Readonly<Record<string, number>> {
+  if (!rawValue) {
+    return defaults;
+  }
+
+  const parsed: Record<string, number> = { ...defaults };
+
+  for (const entry of rawValue.split(',')) {
+    const [rawKey, rawScore] = entry.split(':', 2);
+    const key = rawKey?.trim().toLowerCase();
+    const score = rawScore ? Number(rawScore.trim()) : Number.NaN;
+
+    if (!key || Number.isNaN(score)) {
+      continue;
+    }
+
+    parsed[key] = score;
+  }
+
+  return Object.freeze(parsed);
+}
+
 export const config = {
   app: {
     name: 'multisource-candidate-data-transformer-backend',
@@ -84,5 +141,18 @@ export const config = {
       : [...defaultMergeSourcePriority],
     identityFallbackEnabled: env.MERGE_IDENTITY_FALLBACK_ENABLED,
     sourceMatchers: defaultMergeSourceMatchers,
+  },
+  confidence: {
+    sourceWeights: parseNumericConfig(
+      env.CONFIDENCE_SOURCE_WEIGHTS,
+      defaultConfidenceSourceWeights,
+    ),
+    fieldWeights: parseNumericConfig(
+      env.CONFIDENCE_FIELD_WEIGHTS,
+      defaultConfidenceFieldWeights,
+    ),
+    pipelineVersion: 'phase-6-confidence-provenance-v1',
+    engineVersion: 'confidence-engine-v1',
+    mergeStrategyVersion: 'merge-engine-v1',
   },
 } as const;

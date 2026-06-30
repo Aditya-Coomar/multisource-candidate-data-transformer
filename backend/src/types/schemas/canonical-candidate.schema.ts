@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { candidateMetadataSchema } from './candidate-metadata.schema';
 import { isoDateStringSchema, metadataSchema, uuidSchema } from './common.schema';
 import { confidenceScoreSchema } from './confidence-score.schema';
 import { contactInfoSchema } from './contact-info.schema';
@@ -30,6 +31,7 @@ export const canonicalCandidateSchema = z
     confidence: z.array(confidenceScoreSchema).default([]),
     tags: z.array(z.string().min(1)).default([]),
     additionalData: metadataSchema,
+    candidateMetadata: candidateMetadataSchema.optional(),
     createdAt: isoDateStringSchema,
     updatedAt: isoDateStringSchema,
   })

@@ -17,10 +17,12 @@ import {
 import {
   canonicalCandidateSchema,
   partialCandidateSchema,
+  projectionConfigSchema,
 } from '../src/types/schemas';
 import {
   validateCanonicalCandidate,
   validatePartialCandidate,
+  validateProjectionConfig,
 } from '../src/utils/validators';
 import { findCircularImports } from './helpers/findCircularImports';
 
@@ -204,8 +206,48 @@ describe('Phase 2 domain models', () => {
     const config = createProjectionConfig();
 
     expect(config.target).toBe('api');
-    expect(config.fieldAllowList).toEqual([]);
-    expect(config.transforms).toEqual([]);
+    expect(config.fields).toEqual([]);
+    expect(config.exclude).toEqual([]);
+    expect(config.computedFields).toEqual([]);
+    expect(config.missingValuePolicy).toBe('omit');
+  });
+
+  it('maps legacy projection config keys into the phase 7 runtime shape', () => {
+    const config = createProjectionConfig({
+      fieldAllowList: ['fullName'],
+      fieldBlockList: ['confidence'],
+      transforms: ['primary_email'],
+      includeNullishFields: true,
+    });
+
+    expect(config.fields).toEqual(['fullName']);
+    expect(config.exclude).toEqual(['confidence']);
+    expect(config.computedFields).toEqual(['primary_email']);
+    expect(config.missingValuePolicy).toBe('null');
+  });
+
+  it('validates projection config payloads against the strict runtime schema', () => {
+    const payload = projectionConfigSchema.parse({
+      id: 'f4b8d7a5-6fd6-4b9b-9fd9-8c1d8a4b0f42',
+      fields: ['fullName'],
+      rename: {
+        fullName: 'candidate.name',
+      },
+    });
+
+    expect(validateProjectionConfig(payload).rename.fullName).toBe(
+      'candidate.name',
+    );
+  });
+
+  it('rejects projection config payloads with unknown properties', () => {
+    expect(() =>
+      validateProjectionConfig({
+        id: 'f4b8d7a5-6fd6-4b9b-9fd9-8c1d8a4b0f42',
+        fields: ['fullName'],
+        unsafe: true,
+      }),
+    ).toThrow();
   });
 
   it('has no circular imports across the domain package', () => {

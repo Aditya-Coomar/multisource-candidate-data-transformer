@@ -1,6 +1,7 @@
 import { ZodType } from 'zod';
 import logger from '../logger';
 import {
+  candidateMetadataSchema,
   canonicalCandidateSchema,
   confidenceScoreSchema,
   contactInfoSchema,
@@ -16,6 +17,7 @@ import {
   sourceRecordSchema,
 } from '../types/schemas';
 import type {
+  CandidateMetadata,
   CanonicalCandidate,
   ConfidenceScore,
   ContactInfo,
@@ -56,6 +58,14 @@ export function validateCanonicalCandidate(
     canonicalCandidateSchema,
     payload,
     'CanonicalCandidate',
+  );
+}
+
+export function validateCandidateMetadata(payload: unknown): CandidateMetadata {
+  return validateSchema(
+    candidateMetadataSchema,
+    payload,
+    'CandidateMetadata',
   );
 }
 

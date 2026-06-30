@@ -10,6 +10,12 @@ export interface ConfidenceScore extends IdentifiableEntity {
   readonly reason?: string;
   readonly sourceRecordId?: string;
   readonly calculatedAt?: string;
+  readonly strategy?: string;
+  readonly sourceWeight?: number;
+  readonly agreementScore?: number;
+  readonly completenessScore?: number;
+  readonly validationScore?: number;
+  readonly fieldWeight?: number;
 }
 
 /**
@@ -26,5 +32,11 @@ export function createConfidenceScore(
     reason: input.reason,
     sourceRecordId: input.sourceRecordId,
     calculatedAt: input.calculatedAt ?? new Date().toISOString(),
+    strategy: input.strategy,
+    sourceWeight: input.sourceWeight,
+    agreementScore: input.agreementScore,
+    completenessScore: input.completenessScore,
+    validationScore: input.validationScore,
+    fieldWeight: input.fieldWeight,
   });
 }

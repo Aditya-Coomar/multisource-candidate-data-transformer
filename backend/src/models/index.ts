@@ -1,3 +1,4 @@
+export * from './candidate-metadata';
 export * from './canonical-candidate';
 export * from './confidence-score';
 export * from './contact-info';
