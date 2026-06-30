@@ -23,7 +23,11 @@ const envSchema = z.object({
   MAX_UPLOAD_FILES: z.coerce.number().int().positive().default(10),
   LLM_ENABLED: z.coerce.boolean().default(true),
   OPENROUTER_API_KEY: z.string().trim().optional(),
-  OPENROUTER_BASE_URL: z.string().trim().min(1).default('https://openrouter.ai/api/v1'),
+  OPENROUTER_BASE_URL: z
+    .string()
+    .trim()
+    .min(1)
+    .default('https://openrouter.ai/api/v1'),
   OPENROUTER_APP_URL: z.string().trim().min(1).default('http://localhost:3000'),
   LLM_MODEL: z.string().trim().min(1).default('google/gemini-2.5-flash'),
   LLM_TIMEOUT_MS: z.coerce.number().int().positive().default(10000),
@@ -52,6 +56,7 @@ const defaultCorsOrigins = [
   'http://localhost:3000',
   'http://localhost:3001',
   'http://127.0.0.1:3000',
+  'https://multisource-candidate-data-transfor.vercel.app',
 ];
 
 const defaultMergeSourcePriority = [
@@ -180,7 +185,9 @@ function parseStageList(value: string | undefined): readonly LLMStageName[] {
     value
       .split(',')
       .map((entry) => entry.trim())
-      .filter((entry): entry is LLMStageName => allowedStages.has(entry as LLMStageName)),
+      .filter((entry): entry is LLMStageName =>
+        allowedStages.has(entry as LLMStageName),
+      ),
   );
 }
 
