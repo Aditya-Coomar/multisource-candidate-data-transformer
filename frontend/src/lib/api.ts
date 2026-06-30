@@ -5,7 +5,7 @@ import type {
 } from "@/types/api";
 
 const DEFAULT_API_BASE_URL =
-  "https://multisource-candidate-data-transformer.fly.dev";
+  process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3000";
 
 export async function transformCandidates(
   request: TransformRequest,
