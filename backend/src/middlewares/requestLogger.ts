@@ -7,6 +7,7 @@ export function requestLogger(
   res: Response,
   next: NextFunction,
 ): void {
+  req.requestStartedAt = Date.now();
   const startedAt = process.hrtime.bigint();
   const headers = Object.entries(req.headers).reduce<
     Record<string, string | string[] | undefined>

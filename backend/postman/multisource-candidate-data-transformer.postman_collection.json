@@ -1,0 +1,151 @@
+{
+  "info": {
+    "name": "Multisource Candidate Data Transformer",
+    "_postman_id": "0bc44e16-61e3-4b46-866d-e49d57fd140a",
+    "description": "Phase 8 REST API collection for the multisource candidate data transformer backend.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000"
+    }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/health",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "health"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Version",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/version",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "version"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Validate Projection Config",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"projectionConfig\": {\n    \"id\": \"f4b8d7a5-6fd6-4b9b-9fd9-8c1d8a4b0f42\",\n    \"fields\": [\"fullName\", \"skills\"],\n    \"rename\": {\n      \"fullName\": \"candidate_name\"\n    },\n    \"computedFields\": [\"primary_email\"]\n  }\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/validate-config",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "validate-config"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Transform Candidates",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "projectionConfig",
+              "type": "text",
+              "value": "{\n  \"id\": \"f4b8d7a5-6fd6-4b9b-9fd9-8c1d8a4b0f42\",\n  \"fields\": [\"fullName\", \"skills\"],\n  \"computedFields\": [\"primary_email\"],\n  \"rename\": {\n    \"fullName\": \"candidate_name\",\n    \"primary_email\": \"contact.primary_email\"\n  },\n  \"formatting\": {\n    \"skills\": {\n      \"array\": \"comma-separated\"\n    }\n  }\n}"
+            },
+            {
+              "key": "sources",
+              "type": "text",
+              "value": "[\n  {\n    \"fileName\": \"resume.txt\",\n    \"sourceType\": \"resume\",\n    \"sourceName\": \"Resume Upload\"\n  }\n]"
+            },
+            {
+              "key": "files",
+              "type": "file",
+              "src": ""
+            }
+          ]
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/transform",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "transform"
+          ]
+        }
+      }
+    },
+    {
+      "name": "OpenAPI Document",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/openapi.json",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "openapi.json"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Swagger UI",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/docs",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "docs"
+          ]
+        }
+      }
+    }
+  ]
+}

@@ -17,6 +17,9 @@ const envSchema = z.object({
   MERGE_IDENTITY_FALLBACK_ENABLED: z.coerce.boolean().default(true),
   CONFIDENCE_SOURCE_WEIGHTS: z.string().optional(),
   CONFIDENCE_FIELD_WEIGHTS: z.string().optional(),
+  RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(60000),
+  RATE_LIMIT_MAX_REQUESTS: z.coerce.number().int().positive().default(100),
+  MAX_UPLOAD_FILES: z.coerce.number().int().positive().default(10),
 });
 
 const parsedEnv = envSchema.safeParse(process.env);
@@ -118,16 +121,40 @@ function parseNumericConfig(
   return Object.freeze(parsed);
 }
 
+function parseSizeToBytes(value: string): number {
+  const normalized = value.trim().toLowerCase();
+  const match = normalized.match(/^(\d+)(b|kb|mb|gb)?$/);
+
+  if (!match) {
+    return 10 * 1024 * 1024;
+  }
+
+  const amount = Number(match[1]);
+  const unit = match[2] ?? 'b';
+  const multiplier =
+    unit === 'gb'
+      ? 1024 * 1024 * 1024
+      : unit === 'mb'
+        ? 1024 * 1024
+        : unit === 'kb'
+          ? 1024
+          : 1;
+
+  return amount * multiplier;
+}
+
 export const config = {
   app: {
     name: 'multisource-candidate-data-transformer-backend',
     version: '1.0.0',
+    apiVersion: 'v1',
   },
   env: env.NODE_ENV,
   isProduction: env.NODE_ENV === 'production',
   port: env.PORT,
   logLevel: env.LOG_LEVEL,
   maxUploadSize: env.MAX_UPLOAD_SIZE,
+  maxUploadSizeBytes: parseSizeToBytes(env.MAX_UPLOAD_SIZE),
   corsOrigins: env.CORS_ORIGINS
     ? env.CORS_ORIGINS.split(',')
         .map((origin) => origin.trim())
@@ -154,5 +181,15 @@ export const config = {
     pipelineVersion: 'phase-6-confidence-provenance-v1',
     engineVersion: 'confidence-engine-v1',
     mergeStrategyVersion: 'merge-engine-v1',
+  },
+  projection: {
+    pipelineVersion: 'phase-7-projection-v1',
+  },
+  upload: {
+    maxFiles: env.MAX_UPLOAD_FILES,
+  },
+  rateLimit: {
+    windowMs: env.RATE_LIMIT_WINDOW_MS,
+    maxRequests: env.RATE_LIMIT_MAX_REQUESTS,
   },
 } as const;

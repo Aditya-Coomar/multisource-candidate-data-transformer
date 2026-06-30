@@ -1,0 +1,91 @@
+import type { NextFunction, Request, Response } from 'express';
+import { ZodError } from 'zod';
+import { RequestValidationError, UploadError } from '../errors';
+import { projectionConfigSchema } from '../types/schemas';
+import {
+  transformRequestSchema,
+  validateConfigRequestSchema,
+} from '../validators/request/transform.schema';
+
+function parseJsonField(value: unknown, field: string): unknown {
+  if (typeof value !== 'string') {
+    return value;
+  }
+
+  try {
+    return JSON.parse(value);
+  } catch (error) {
+    throw new RequestValidationError(`Invalid JSON in "${field}".`, {
+      field,
+      cause: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
+export function validateTransformRequest(
+  req: Request,
+  _res: Response,
+  next: NextFunction,
+): void {
+  try {
+    const files = Array.isArray(req.files) ? req.files : [];
+
+    if (files.length === 0) {
+      throw new UploadError('At least one file upload is required.', {
+        statusCode: 400,
+        code: 'MISSING_FILES',
+      });
+    }
+
+    const parsedBody = transformRequestSchema.parse({
+      projectionConfig: parseJsonField(req.body.projectionConfig, 'projectionConfig'),
+      sources: req.body.sources
+        ? parseJsonField(req.body.sources, 'sources')
+        : undefined,
+    });
+
+    req.body = {
+      ...req.body,
+      projectionConfig: projectionConfigSchema.parse(parsedBody.projectionConfig),
+      sources: parsedBody.sources ?? [],
+    };
+
+    next();
+  } catch (error) {
+    next(normalizeValidationError(error));
+  }
+}
+
+export function validateProjectionConfigRequest(
+  req: Request,
+  _res: Response,
+  next: NextFunction,
+): void {
+  try {
+    const payload = validateConfigRequestSchema.parse({
+      projectionConfig: req.body.projectionConfig,
+    });
+
+    req.body = {
+      projectionConfig: projectionConfigSchema.parse(payload.projectionConfig),
+    };
+
+    next();
+  } catch (error) {
+    next(normalizeValidationError(error));
+  }
+}
+
+function normalizeValidationError(error: unknown): Error {
+  if (error instanceof RequestValidationError || error instanceof UploadError) {
+    return error;
+  }
+
+  if (error instanceof ZodError) {
+    return new RequestValidationError('Request validation failed.', error.flatten());
+  }
+
+  return error instanceof Error
+    ? error
+    : new RequestValidationError('Request validation failed.');
+}

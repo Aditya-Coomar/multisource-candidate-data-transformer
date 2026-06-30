@@ -1,14 +1,15 @@
 import { NextFunction, Request, Response } from 'express';
+import multer, { type MulterError } from 'multer';
 import { ZodError } from 'zod';
-import { AppError } from '../errors/AppError';
+import { AppError, UploadError } from '../errors';
 import logger from '../logger';
 
 type ErrorResponse = {
-  status: 'error';
+  success: false;
+  requestId?: string;
   error: {
     code: string;
     message: string;
-    correlationId?: string;
     details?: unknown;
   };
 };
@@ -24,6 +25,8 @@ export function errorHandler(
   const normalizedError =
     error instanceof AppError
       ? error
+      : error instanceof multer.MulterError
+        ? normalizeMulterError(error)
       : error instanceof ZodError
         ? new AppError('Validation failed.', {
             statusCode: 400,
@@ -48,14 +51,36 @@ export function errorHandler(
   });
 
   res.status(normalizedError.statusCode).json({
-    status: 'error',
+    success: false,
+    requestId: req.correlationId,
     error: {
       code: normalizedError.code,
       message: normalizedError.message,
-      correlationId: req.correlationId,
       ...(normalizedError.details !== undefined && {
         details: normalizedError.details,
       }),
     },
+  });
+}
+
+function normalizeMulterError(error: MulterError): UploadError {
+  if (error.code === 'LIMIT_FILE_SIZE') {
+    return new UploadError('Uploaded file exceeds the allowed size.', {
+      statusCode: 413,
+      code: 'FILE_TOO_LARGE',
+    });
+  }
+
+  if (error.code === 'LIMIT_FILE_COUNT') {
+    return new UploadError('Too many uploaded files.', {
+      statusCode: 400,
+      code: 'TOO_MANY_FILES',
+    });
+  }
+
+  return new UploadError('Upload processing failed.', {
+    statusCode: 400,
+    code: 'UPLOAD_ERROR',
+    details: { multerCode: error.code },
   });
 }
