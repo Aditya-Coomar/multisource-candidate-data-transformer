@@ -19,6 +19,7 @@ const app = express();
 
 app.disable('x-powered-by');
 
+app.set('trust proxy', 1);
 app.use(correlationIdMiddleware);
 app.use(requestLogger);
 app.use(helmet(helmetOptions));

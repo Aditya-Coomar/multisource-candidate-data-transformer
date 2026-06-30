@@ -1,6 +1,11 @@
-import type { ApiFailure, TransformRequest, TransformResponse } from "@/types/api";
+import type {
+  ApiFailure,
+  TransformRequest,
+  TransformResponse,
+} from "@/types/api";
 
-const DEFAULT_API_BASE_URL = "http://localhost:3000";
+const DEFAULT_API_BASE_URL =
+  "https://multisource-candidate-data-transformer.fly.dev";
 
 export async function transformCandidates(
   request: TransformRequest,
