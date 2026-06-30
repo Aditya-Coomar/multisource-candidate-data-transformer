@@ -1,8 +1,14 @@
-// src/models/index.ts
-
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
-
-// Export prisma instance for direct use if needed
-export default prisma;
+export * from './canonical-candidate';
+export * from './confidence-score';
+export * from './contact-info';
+export * from './education';
+export * from './experience';
+export * from './location';
+export * from './normalization-operation';
+export * from './normalized-partial-candidate';
+export * from './partial-candidate';
+export * from './projection-config';
+export * from './provenance';
+export * from './skill';
+export * from './social-link';
+export * from './source-record';

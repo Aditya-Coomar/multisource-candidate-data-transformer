@@ -1,0 +1,19 @@
+{
+  "js": "JavaScript",
+  "javascript": "JavaScript",
+  "java script": "JavaScript",
+  "ecmascript": "JavaScript",
+  "ts": "TypeScript",
+  "typescript": "TypeScript",
+  "node": "Node.js",
+  "nodejs": "Node.js",
+  "node.js": "Node.js",
+  "reactjs": "React",
+  "react.js": "React",
+  "react": "React",
+  "postgres": "PostgreSQL",
+  "postgresql": "PostgreSQL",
+  "golang": "Go",
+  "k8s": "Kubernetes",
+  "py": "Python"
+}

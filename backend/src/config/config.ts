@@ -13,6 +13,8 @@ const envSchema = z.object({
     .default('info'),
   MAX_UPLOAD_SIZE: z.string().trim().min(1).default('10mb'),
   CORS_ORIGINS: z.string().optional(),
+  MERGE_SOURCE_PRIORITY: z.string().optional(),
+  MERGE_IDENTITY_FALLBACK_ENABLED: z.coerce.boolean().default(true),
 });
 
 const parsedEnv = envSchema.safeParse(process.env);
@@ -33,6 +35,32 @@ const defaultCorsOrigins = [
   'http://127.0.0.1:3000',
 ];
 
+const defaultMergeSourcePriority = [
+  'resume',
+  'ats',
+  'csv',
+  'github',
+  'linkedin',
+  'recruiter-notes',
+  'job-board',
+  'social-profile',
+  'manual',
+  'other',
+] as const;
+
+const defaultMergeSourceMatchers = {
+  resume: ['resume', 'resumeextractor'],
+  ats: ['ats', 'atsjsonextractor'],
+  csv: ['csv', 'csvparser'],
+  github: ['github'],
+  linkedin: ['linkedin'],
+  'recruiter-notes': ['recruiter notes', 'recruiter-notes', 'recruiter'],
+  'job-board': ['job-board', 'job board'],
+  'social-profile': ['social-profile', 'social profile'],
+  manual: ['manual'],
+  other: ['other'],
+} as const;
+
 export const config = {
   app: {
     name: 'multisource-candidate-data-transformer-backend',
@@ -48,4 +76,13 @@ export const config = {
         .map((origin) => origin.trim())
         .filter(Boolean)
     : defaultCorsOrigins,
+  merge: {
+    sourcePriority: env.MERGE_SOURCE_PRIORITY
+      ? env.MERGE_SOURCE_PRIORITY.split(',')
+          .map((entry) => entry.trim().toLowerCase())
+          .filter(Boolean)
+      : [...defaultMergeSourcePriority],
+    identityFallbackEnabled: env.MERGE_IDENTITY_FALLBACK_ENABLED,
+    sourceMatchers: defaultMergeSourceMatchers,
+  },
 } as const;
