@@ -1,0 +1,16 @@
+export const SAMPLE_PROJECTION_CONFIG = JSON.stringify(
+  {
+    fields: [
+      { path: "candidate_name", from: "full_name", type: "string", required: true },
+      { path: "primary_email", from: "emails[0]", type: "string", required: true },
+      { path: "phone", from: "phones[0]", type: "string", normalize: "E164" },
+      { path: "skills", from: "skills[].name", type: "string[]", normalize: "canonical" },
+      { path: "recent_roles", from: "experience", type: "object[]" },
+    ],
+    include_confidence: true,
+    include_provenance: true,
+    on_missing: "null",
+  },
+  null,
+  2,
+);
