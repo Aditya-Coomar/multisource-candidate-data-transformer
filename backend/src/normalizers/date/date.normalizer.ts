@@ -88,9 +88,18 @@ export class DateNormalizer implements Normalizer<string> {
   }
 
   private toYearMonth(value: string): string | undefined {
+    if (/^(present|current|now)$/i.test(value)) {
+      return undefined;
+    }
+
     const isoMatch = value.match(/^(\d{4})-(\d{2})$/);
     if (isoMatch) {
       return `${isoMatch[1]}-${isoMatch[2]}`;
+    }
+
+    const yearMatch = value.match(/^(\d{4})$/);
+    if (yearMatch) {
+      return `${yearMatch[1]}-01`;
     }
 
     const slashMatch = value.match(/^(\d{1,2})\/(\d{4})$/);

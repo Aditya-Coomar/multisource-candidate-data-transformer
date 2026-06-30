@@ -1,10 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   createContactInfo,
   createLocation,
   createPartialCandidate,
   createSourceRecord,
 } from '../../src/models';
+import { LLMRuntimeContext } from '../../src/llm/runtime';
 import { MergeStage } from '../../src/pipeline/stages/merge.stage';
 import { ConfidenceStage } from '../../src/pipeline/stages/confidence.stage';
 import { NormalizeStage } from '../../src/pipeline/stages/normalize.stage';
@@ -141,5 +142,109 @@ describe('ConfidenceStage', () => {
     expect(validateCanonicalCandidate(enrichedCandidate).id).toBe(
       enrichedCandidate.id,
     );
+  });
+
+  it('raises semantic skill confidence when the LLM grounds the value in raw source text', async () => {
+    const resumeSource = createSourceRecord({
+      sourceId: 'resume-confidence-2',
+      sourceType: 'resume',
+      sourceName: 'Resume Upload',
+      fileName: 'resume.txt',
+      mimeType: 'text/plain',
+      receivedAt: '2026-06-30T00:00:00.000Z',
+      parser: 'TextParser',
+      extractor: 'ResumeExtractor',
+    });
+
+    const partialCandidates = [
+      createPartialCandidate({
+        fullName: 'Aditya Coomar',
+        skills: [
+          {
+            id: 'skill-1',
+            name: 'C',
+            provenance: [],
+            confidence: [],
+          },
+        ],
+        additionalData: {
+          __sourceEvidence: {
+            rawText: 'Programming Languages: Python, C, C++, JavaScript, TypeScript',
+            sections: {
+              skills: 'Programming Languages: Python, C, C++, JavaScript, TypeScript',
+            },
+          },
+        },
+        sourceRecords: [resumeSource],
+      }),
+    ];
+
+    const normalizeStage = new NormalizeStage();
+    const mergeStage = new MergeStage();
+    const confidenceStage = new ConfidenceStage();
+    const normalizedCandidates = await normalizeStage.execute(partialCandidates);
+    const canonicalCandidates = await mergeStage.execute(normalizedCandidates);
+
+    const orchestrator = {
+      isAvailable: () => true,
+      runJson: vi.fn().mockResolvedValue({
+        ok: true,
+        data: {
+          assessments: [
+            {
+              fieldPath: 'skills',
+              score: 0.95,
+              grounded: true,
+              rationale: 'The skills section explicitly lists the extracted skills.',
+            },
+            {
+              fieldPath: 'skills.0',
+              score: 0.95,
+              grounded: true,
+              rationale: 'The skill "C" appears explicitly in the skills section.',
+            },
+          ],
+          fieldExplanations: [],
+          warnings: [],
+          evidence: [],
+          confidence: 0.95,
+        },
+        envelope: {
+          stage: 'confidence',
+          inputHash: 'test-hash',
+          model: 'google/gemini-2.5-flash',
+          decision: {},
+          evidence: [],
+          confidence: 0.95,
+          recoverable: true,
+        },
+      }),
+    };
+    const llmContext = new LLMRuntimeContext(
+      {
+        enabled: true,
+        mode: 'hybrid',
+        stages: ['confidence'],
+        strictGrounding: true,
+        maxLatencyMs: 10000,
+        includeExplanations: true,
+        onFailure: 'fallback',
+      },
+      orchestrator as never,
+    );
+
+    const enrichedCandidates = await confidenceStage.execute(
+      canonicalCandidates,
+      normalizedCandidates,
+      llmContext,
+    );
+    const skillConfidence = enrichedCandidates[0]?.skills[0]?.confidence[0];
+    const aggregateSkillsConfidence = enrichedCandidates[0]?.confidence.find(
+      (entry) => entry.fieldPath === 'skills',
+    );
+
+    expect(skillConfidence?.strategy).toBe('llm-grounded-hybrid');
+    expect(skillConfidence?.value).toBeGreaterThan(0.7);
+    expect(aggregateSkillsConfidence?.value).toBeGreaterThan(0.7);
   });
 });

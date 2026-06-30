@@ -8,7 +8,11 @@ import { createLocation } from '../../models/location';
 import { createSourceRecord } from '../../models/source-record';
 import { createSkill } from '../../models/skill';
 import { ExtractorFactory } from '../../extractors/base/extractor.factory';
-import type { IngestionSource } from '../../extractors/base/extractor.types';
+import type {
+  IngestionSource,
+  ParsedContent,
+  ParsedTextContent,
+} from '../../extractors/base/extractor.types';
 import type { PartialCandidate } from '../../models/partial-candidate';
 import { ParserFactory } from '../../parsers/parser.factory';
 import type { LLMRuntimeContext } from '../../llm/runtime';
@@ -85,6 +89,18 @@ const BLOCKED_MIME_TYPES = new Set([
 
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
 const SUPPORTED_EXTENSIONS = new Set(['.csv', '.json', '.pdf', '.docx', '.txt']);
+const SECTION_HEADINGS = Object.freeze({
+  summary: ['summary', 'profile', 'professional summary', 'about'],
+  skills: ['skills', 'technical skills', 'core competencies', 'technologies'],
+  experience: [
+    'experience',
+    'work experience',
+    'employment',
+    'professional experience',
+  ],
+  education: ['education', 'academic background', 'qualifications'],
+  projects: ['projects'],
+});
 
 function getFileExtension(fileName: string): string {
   const normalized = fileName.toLowerCase();
@@ -158,6 +174,10 @@ export class ExtractStage {
           createPartialCandidate({
             ...candidate,
             sourceRecords: [sourceRecord],
+            additionalData: Object.freeze({
+              ...candidate.additionalData,
+              __sourceEvidence: buildSourceEvidence(parsedContent),
+            }),
           }),
           parsedContent,
           llmContext,
@@ -300,4 +320,60 @@ export class ExtractStage {
             ),
     });
   }
+}
+
+function buildSourceEvidence(
+  parsedContent: ParsedContent,
+): Readonly<Record<string, unknown>> {
+  if (parsedContent.kind === 'text') {
+    return Object.freeze({
+      rawText: parsedContent.text,
+      sections: buildTextSections(parsedContent),
+    });
+  }
+
+  if (parsedContent.kind === 'csv') {
+    return Object.freeze({
+      rawText: JSON.stringify({
+        headers: parsedContent.headers,
+        rows: parsedContent.rows,
+      }),
+      sections: {
+        record: JSON.stringify(parsedContent.rows),
+      },
+    });
+  }
+
+  return Object.freeze({
+    rawText: JSON.stringify(parsedContent.data),
+    sections: {
+      record: JSON.stringify(parsedContent.data),
+    },
+  });
+}
+
+function buildTextSections(
+  parsedContent: ParsedTextContent,
+): Readonly<Record<string, string>> {
+  const sections: Record<string, string> = {};
+
+  for (const [sectionName, headings] of Object.entries(SECTION_HEADINGS)) {
+    const section = headings
+      .map((heading) => extractSection(parsedContent.text, heading))
+      .find((value): value is string => Boolean(value));
+
+    if (section) {
+      sections[sectionName] = section;
+    }
+  }
+
+  return Object.freeze(sections);
+}
+
+function extractSection(text: string, heading: string): string | undefined {
+  const pattern = new RegExp(
+    `${heading}\\s*[:\\n\\r]+([\\s\\S]*?)(?:\\n[A-Z][A-Z\\s]{2,}|$)`,
+    'i',
+  );
+  return text.match(pattern)?.[1]?.trim();
 }

@@ -1,6 +1,10 @@
 import { createContactInfo } from '../../models/contact-info';
+import { createEducation } from '../../models/education';
+import { createExperience } from '../../models/experience';
+import { createLocation } from '../../models/location';
 import { createPartialCandidate } from '../../models/partial-candidate';
 import { createSkill } from '../../models/skill';
+import { createSocialLink } from '../../models/social-link';
 import type { PartialCandidate } from '../../models/partial-candidate';
 import type { Extractor } from '../base/extractor.interface';
 import type { IngestionSource, ParsedContent, ParsedCsvContent } from '../base/extractor.types';
@@ -53,11 +57,29 @@ export class CsvExtractor implements Extractor<ParsedCsvContent> {
       const skillValues = splitValues(
         readRowValue(row, ['skills', 'skill', 'technologies']),
       );
+      const city = readRowValue(row, ['city', 'location_city']);
+      const region = readRowValue(row, ['region', 'state', 'location_region']);
+      const country = readRowValue(row, ['country', 'location_country']);
+      const linkedin = readRowValue(row, ['linkedin', 'linkedin_url']);
+      const github = readRowValue(row, ['github', 'github_url']);
+      const portfolio = readRowValue(row, ['portfolio', 'website', 'personal_site']);
+      const company = readRowValue(row, ['current_company', 'company', 'employer']);
+      const title = readRowValue(row, ['headline', 'title', 'current_title']);
+      const school = readRowValue(row, ['school', 'institution', 'university', 'college']);
 
       return createPartialCandidate({
         fullName,
-        headline: readRowValue(row, ['headline', 'title', 'current_title']),
+        headline: title,
         summary: readRowValue(row, ['summary', 'profile_summary', 'notes']),
+        location:
+          city || region || country
+            ? createLocation({
+                city,
+                region,
+                country,
+                formatted: [city, region, country].filter(Boolean).join(', '),
+              })
+            : undefined,
         contactInfo: [
           ...emailValues.map((value, index) =>
             createContactInfo({
@@ -74,6 +96,32 @@ export class CsvExtractor implements Extractor<ParsedCsvContent> {
             }),
           ),
         ],
+        socialLinks: [
+          ...(linkedin ? [createSocialLink({ platform: 'linkedin', url: linkedin })] : []),
+          ...(github ? [createSocialLink({ platform: 'github', url: github })] : []),
+          ...(portfolio ? [createSocialLink({ platform: 'portfolio', url: portfolio })] : []),
+        ],
+        experiences: company
+          ? [
+              createExperience({
+                employer: company,
+                title,
+                startDate: readRowValue(row, ['start', 'start_date', 'current_start']),
+                endDate: readRowValue(row, ['end', 'end_date', 'current_end']),
+                isCurrent: !readRowValue(row, ['end', 'end_date', 'current_end']),
+              }),
+            ]
+          : [],
+        education: school
+          ? [
+              createEducation({
+                institution: school,
+                degree: readRowValue(row, ['degree']),
+                fieldOfStudy: readRowValue(row, ['field', 'major', 'field_of_study']),
+                endDate: readRowValue(row, ['grad_year', 'graduation_year', 'end_year']),
+              }),
+            ]
+          : [],
         skills: skillValues.map((name) => createSkill({ name })),
         additionalData: Object.freeze({ rawRow: row }),
       });

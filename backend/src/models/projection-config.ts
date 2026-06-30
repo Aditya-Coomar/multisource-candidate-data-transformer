@@ -6,6 +6,24 @@ export type ProjectionArrayFormat = 'preserve' | 'comma-separated';
 export type ProjectionPhoneFormat = 'raw' | 'e164';
 export type ProjectionDateFormat = 'iso' | 'mm/yyyy' | 'yyyy';
 export type ProjectionLocationFormat = 'readable' | 'iso-country';
+export type ProjectionFieldType =
+  | 'string'
+  | 'string[]'
+  | 'number'
+  | 'boolean'
+  | 'object'
+  | 'object[]';
+export type ProjectionFieldNormalization = 'E164' | 'e164' | 'canonical';
+
+export interface ProjectionFieldSpec {
+  readonly path: string;
+  readonly from?: string;
+  readonly type?: ProjectionFieldType;
+  readonly required?: boolean;
+  readonly normalize?: ProjectionFieldNormalization;
+}
+
+export type ProjectionFieldSelection = string | ProjectionFieldSpec;
 
 export interface ProjectionFieldFormatting {
   readonly array?: ProjectionArrayFormat;
@@ -13,6 +31,7 @@ export interface ProjectionFieldFormatting {
   readonly date?: ProjectionDateFormat;
   readonly location?: ProjectionLocationFormat;
   readonly joinWith?: string;
+  readonly normalize?: ProjectionFieldNormalization;
 }
 
 /**
@@ -21,7 +40,7 @@ export interface ProjectionFieldFormatting {
  */
 export interface ProjectionConfig extends IdentifiableEntity {
   readonly target: 'api' | 'csv' | 'json' | 'report' | 'other';
-  readonly fields: readonly string[];
+  readonly fields: readonly ProjectionFieldSelection[];
   readonly exclude: readonly string[];
   readonly rename: Readonly<Record<string, string>>;
   readonly computedFields: readonly string[];

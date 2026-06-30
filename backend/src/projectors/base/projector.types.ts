@@ -2,6 +2,7 @@ import type {
   CanonicalCandidate,
   ConfidenceScore,
   ProjectionConfig,
+  ProjectionFieldType,
   ProjectionFieldFormatting,
   Provenance,
 } from '../../models';
@@ -11,6 +12,8 @@ export interface ProjectionPlanField {
   readonly outputPath: string;
   readonly formatting?: ProjectionFieldFormatting;
   readonly computed: boolean;
+  readonly required: boolean;
+  readonly type?: ProjectionFieldType;
 }
 
 export interface ProjectionPlan {

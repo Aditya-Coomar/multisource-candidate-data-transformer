@@ -115,6 +115,30 @@ export class ProjectionEngine
       return value;
     }
 
+    if (formatting.normalize === 'canonical') {
+      if (Array.isArray(value)) {
+        return value.map((entry) =>
+          typeof entry === 'string' ? canonicalizeSkillName(entry) : entry,
+        );
+      }
+
+      if (typeof value === 'string') {
+        return canonicalizeSkillName(value);
+      }
+    }
+
+    if (formatting.normalize === 'E164' || formatting.normalize === 'e164') {
+      if (Array.isArray(value)) {
+        return value.map((entry) =>
+          typeof entry === 'string' ? entry.replace(/[^\d+]/g, '') : entry,
+        );
+      }
+
+      if (typeof value === 'string') {
+        return value.replace(/[^\d+]/g, '');
+      }
+    }
+
     if (formatting.location && typeof value === 'object' && !Array.isArray(value)) {
       const location = value as Record<string, unknown>;
 
@@ -186,6 +210,39 @@ export class ProjectionEngine
 
     return JSON.stringify(value);
   }
+}
+
+function canonicalizeSkillName(value: string): string {
+  const trimmed = value.trim().replace(/\s+/g, ' ');
+  const aliases: Record<string, string> = {
+    js: 'JavaScript',
+    javascript: 'JavaScript',
+    ts: 'TypeScript',
+    typescript: 'TypeScript',
+    node: 'Node.js',
+    nodejs: 'Node.js',
+    'node.js': 'Node.js',
+    reactjs: 'React',
+    'react.js': 'React',
+    react: 'React',
+    postgres: 'PostgreSQL',
+    postgresql: 'PostgreSQL',
+    golang: 'Go',
+    k8s: 'Kubernetes',
+    py: 'Python',
+  };
+  const alias = aliases[trimmed.toLowerCase()];
+
+  if (alias) {
+    return alias;
+  }
+
+  return trimmed
+    .split(/\s+/)
+    .map((segment) =>
+      segment ? `${segment[0]!.toUpperCase()}${segment.slice(1).toLowerCase()}` : segment,
+    )
+    .join(' ');
 }
 
 function sanitizeForJson(value: unknown): unknown {

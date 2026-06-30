@@ -126,7 +126,7 @@ export function validateConfidenceScore(payload: unknown): ConfidenceScore {
 export function validateProjectionConfig(payload: unknown): ProjectionConfig {
   return validateSchema(
     projectionConfigSchema,
-    payload,
+    payload ?? {},
     'ProjectionConfig',
   );
 }

@@ -1,7 +1,11 @@
 import { MalformedInputError } from '../../errors';
 import { createContactInfo } from '../../models/contact-info';
+import { createEducation } from '../../models/education';
+import { createExperience } from '../../models/experience';
+import { createLocation } from '../../models/location';
 import { createPartialCandidate } from '../../models/partial-candidate';
 import { createSkill } from '../../models/skill';
+import { createSocialLink } from '../../models/social-link';
 import type { PartialCandidate } from '../../models/partial-candidate';
 import type { Extractor } from '../base/extractor.interface';
 import type { IngestionSource, ParsedContent, ParsedJsonContent } from '../base/extractor.types';
@@ -31,6 +35,21 @@ function toStringArray(value: unknown): string[] {
   }
 
   return [];
+}
+
+function getNestedRecord(record: JsonRecord, keys: readonly string[]): JsonRecord | undefined {
+  for (const key of keys) {
+    const value = record[key];
+    if (isRecord(value)) {
+      return value;
+    }
+  }
+
+  return undefined;
+}
+
+function getRecordArray(value: unknown): JsonRecord[] {
+  return Array.isArray(value) ? value.filter(isRecord) : [];
 }
 
 function getCandidates(data: unknown): JsonRecord[] {
@@ -69,6 +88,10 @@ export class AtsJsonExtractor implements Extractor<ParsedJsonContent> {
       const emails = toStringArray(record.email ?? record.emails);
       const phones = toStringArray(record.phone ?? record.phones);
       const skills = toStringArray(record.skills);
+      const location = getNestedRecord(record, ['location', 'address']);
+      const links = getNestedRecord(record, ['links', 'profiles', 'urls']);
+      const experiences = getRecordArray(record.experience ?? record.experiences ?? record.jobs);
+      const education = getRecordArray(record.education ?? record.schools);
 
       return createPartialCandidate({
         firstName: toStringValue(record.firstName ?? record.first_name),
@@ -90,6 +113,21 @@ export class AtsJsonExtractor implements Extractor<ParsedJsonContent> {
         })(),
         headline: toStringValue(record.headline ?? record.title),
         summary: toStringValue(record.summary ?? record.profileSummary),
+        location:
+          location ||
+          toStringValue(record.location) ||
+          toStringValue(record.address)
+            ? createLocation({
+                raw: toStringValue(record.location) ?? toStringValue(record.address),
+                city: location ? toStringValue(location.city) : undefined,
+                region: location ? toStringValue(location.region ?? location.state) : undefined,
+                country: location ? toStringValue(location.country) : undefined,
+                formatted:
+                  location && toStringValue(location.formatted)
+                    ? toStringValue(location.formatted)
+                    : toStringValue(record.location),
+              })
+            : undefined,
         contactInfo: [
           ...emails.map((value, index) =>
             createContactInfo({
@@ -106,6 +144,45 @@ export class AtsJsonExtractor implements Extractor<ParsedJsonContent> {
             }),
           ),
         ],
+        socialLinks: [
+          ...[
+            ['linkedin', links?.linkedin ?? record.linkedin],
+            ['github', links?.github ?? record.github],
+            ['portfolio', links?.portfolio ?? record.portfolio ?? record.website],
+          ].flatMap(([platform, value]) => {
+            const url = toStringValue(value);
+            return url
+              ? [
+                  createSocialLink({
+                    platform: platform as 'linkedin' | 'github' | 'portfolio',
+                    url,
+                  }),
+                ]
+              : [];
+          }),
+        ],
+        experiences: experiences.map((experience) =>
+          createExperience({
+            employer:
+              toStringValue(experience.company ?? experience.employer ?? experience.organization) ??
+              'Unknown Employer',
+            title: toStringValue(experience.title ?? experience.role),
+            description: toStringValue(experience.summary ?? experience.description),
+            startDate: toStringValue(experience.start ?? experience.startDate),
+            endDate: toStringValue(experience.end ?? experience.endDate),
+            isCurrent: Boolean(experience.isCurrent ?? experience.current),
+          }),
+        ),
+        education: education.map((entry) =>
+          createEducation({
+            institution:
+              toStringValue(entry.institution ?? entry.school ?? entry.university) ??
+              'Unknown Institution',
+            degree: toStringValue(entry.degree),
+            fieldOfStudy: toStringValue(entry.field ?? entry.major ?? entry.fieldOfStudy),
+            endDate: toStringValue(entry.endYear ?? entry.graduationYear ?? entry.endDate),
+          }),
+        ),
         skills: skills.map((name) => createSkill({ name })),
         additionalData: Object.freeze({ rawRecord: record }),
       });

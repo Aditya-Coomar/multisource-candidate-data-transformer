@@ -122,6 +122,149 @@ describe('ProjectionStage', () => {
     });
   });
 
+  it('emits the assignment default output schema when no fields are configured', async () => {
+    const sourceRecord = createSourceRecord({
+      sourceId: 'resume-default-schema',
+      sourceType: 'resume',
+      sourceName: 'Resume Upload',
+      fileName: 'resume.txt',
+      mimeType: 'text/plain',
+      parser: 'TextParser',
+      extractor: 'ResumeExtractor',
+    });
+    const candidate = createCanonicalCandidate({
+      fullName: 'Jane Doe',
+      headline: 'Senior Backend Engineer',
+      location: createLocation({
+        city: 'Bengaluru',
+        region: 'Karnataka',
+        country: 'IN',
+      }),
+      contactInfo: [
+        createContactInfo({ kind: 'email', value: 'jane@example.com', isPrimary: true }),
+        createContactInfo({ kind: 'phone', value: '+919876543210', isPrimary: false }),
+      ],
+      skills: [
+        createSkill({ name: 'TypeScript' }),
+      ],
+      sourceRecords: [sourceRecord],
+      provenance: [
+        createProvenance({
+          sourceRecordId: sourceRecord.id,
+          fieldPath: 'fullName',
+          sourceName: 'Resume Upload',
+          extractor: 'ResumeExtractor',
+        }),
+      ],
+      confidence: [
+        createConfidenceScore({
+          fieldPath: 'overall',
+          value: 0.91,
+          sourceRecordId: sourceRecord.id,
+        }),
+      ],
+    });
+
+    const [projectedCandidate] = await new ProjectionStage().execute(
+      [candidate],
+      createProjectionConfig(),
+    );
+
+    expect(Object.keys(projectedCandidate)).toEqual([
+      'candidate_id',
+      'full_name',
+      'emails',
+      'phones',
+      'location',
+      'links',
+      'headline',
+      'years_experience',
+      'skills',
+      'experience',
+      'education',
+      'provenance',
+      'overall_confidence',
+    ]);
+    expect(projectedCandidate).toMatchObject({
+      candidate_id: candidate.id,
+      full_name: 'Jane Doe',
+      emails: ['jane@example.com'],
+      phones: ['+919876543210'],
+      location: {
+        city: 'Bengaluru',
+        region: 'Karnataka',
+        country: 'IN',
+      },
+      links: {
+        linkedin: null,
+        github: null,
+        portfolio: null,
+        other: [],
+      },
+      headline: 'Senior Backend Engineer',
+      years_experience: null,
+      skills: [
+        {
+          name: 'TypeScript',
+          confidence: null,
+          sources: ['Resume Upload'],
+        },
+      ],
+      experience: [],
+      education: [],
+      provenance: [
+        {
+          field: 'full_name',
+          source: 'Resume Upload',
+          method: 'ResumeExtractor',
+        },
+      ],
+      overall_confidence: 0.91,
+    });
+  });
+
+  it('supports assignment-style field specs with from, path, normalize, and snake-case flags', async () => {
+    const candidate = createCanonicalCandidate({
+      fullName: 'Jane Doe',
+      contactInfo: [
+        createContactInfo({ kind: 'email', value: 'jane@example.com', isPrimary: true }),
+        createContactInfo({ kind: 'phone', value: '+1 (555) 111-2222', isPrimary: true }),
+      ],
+      skills: [
+        createSkill({ name: 'ts' }),
+        createSkill({ name: 'nodejs' }),
+      ],
+    });
+    const config = createProjectionConfig({
+      fields: [
+        { path: 'full_name', from: 'fullName', type: 'string', required: true },
+        { path: 'primary_email', from: 'emails[0]', type: 'string', required: true },
+        { path: 'phone', from: 'phones[0]', type: 'string', normalize: 'E164' },
+        { path: 'skills', from: 'skills[].name', type: 'string[]', normalize: 'canonical' },
+      ],
+      includeConfidence: true,
+      missingValuePolicy: 'null',
+    });
+
+    const [projectedCandidate] = await new ProjectionStage().execute(
+      [candidate],
+      config,
+    );
+
+    expect(projectedCandidate).toMatchObject({
+      full_name: 'Jane Doe',
+      primary_email: 'jane@example.com',
+      phone: '+15551112222',
+      skills: ['TypeScript', 'Node.js'],
+      confidence: {
+        full_name: [],
+        primary_email: [],
+        phone: [],
+        skills: [],
+      },
+    });
+  });
+
   it('supports missing field null policy and metadata injection for matching field paths', async () => {
     const sourceRecord = createSourceRecord({
       sourceId: 'resume-projection-2',

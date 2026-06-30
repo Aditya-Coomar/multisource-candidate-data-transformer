@@ -22,11 +22,21 @@ describe('DateNormalizer', () => {
     expect(result.value).toBe('2024-01');
   });
 
+  it('normalizes bare years to year-month values', () => {
+    const normalizer = new DateNormalizer();
+    const result = normalizer.normalize('2024', {
+      field: 'experience.startDate',
+      timestamp: '2026-06-30T00:00:00.000Z',
+    });
+
+    expect(result.value).toBe('2024-01');
+  });
+
   it('rejects unsupported dates', () => {
     const normalizer = new DateNormalizer();
 
     expect(() =>
-      normalizer.normalize('2024', {
+      normalizer.normalize('Spring 2024', {
         field: 'experience.startDate',
         timestamp: '2026-06-30T00:00:00.000Z',
       }),
