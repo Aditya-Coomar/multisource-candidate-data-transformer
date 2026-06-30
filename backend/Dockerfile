@@ -67,6 +67,7 @@ COPY --from=build --chown=nodejs:nodejs /app/dist ./dist
 COPY --from=build --chown=nodejs:nodejs /app/node_modules ./node_modules
 COPY --from=build --chown=nodejs:nodejs /app/package*.json ./
 COPY --from=build --chown=nodejs:nodejs /app/prisma ./prisma
+COPY --from=build --chown=nodejs:nodejs /app/resources ./resources
 
 # Copy Prisma client from build stage
 COPY --from=build --chown=nodejs:nodejs /app/node_modules/@prisma/client ./node_modules/@prisma/client

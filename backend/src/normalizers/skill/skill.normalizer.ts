@@ -8,14 +8,26 @@ import type {
 import type { Normalizer } from '../base/normalizer.interface';
 
 const SKILL_FIELDS = new Set(['skill.name']);
-const skillDictionaryPath = path.resolve(
-  process.cwd(),
-  'resources',
-  'skills.dictionary.json',
-);
-const skillDictionary = JSON.parse(
-  fs.readFileSync(skillDictionaryPath, 'utf8'),
-) as Record<string, string>;
+const FALLBACK_SKILL_DICTIONARY: Readonly<Record<string, string>> = Object.freeze({
+  js: 'JavaScript',
+  javascript: 'JavaScript',
+  'java script': 'JavaScript',
+  ecmascript: 'JavaScript',
+  ts: 'TypeScript',
+  typescript: 'TypeScript',
+  node: 'Node.js',
+  nodejs: 'Node.js',
+  'node.js': 'Node.js',
+  reactjs: 'React',
+  'react.js': 'React',
+  react: 'React',
+  postgres: 'PostgreSQL',
+  postgresql: 'PostgreSQL',
+  golang: 'Go',
+  k8s: 'Kubernetes',
+  py: 'Python',
+});
+const skillDictionary = loadSkillDictionary();
 
 function stripControlCharacters(value: string): string {
   return Array.from(value)
@@ -65,4 +77,23 @@ export class SkillNormalizer implements Normalizer<string> {
       )
       .join(' ');
   }
+}
+
+function loadSkillDictionary(): Readonly<Record<string, string>> {
+  const candidatePaths = [
+    path.resolve(process.cwd(), 'resources', 'skills.dictionary.json'),
+    path.resolve(__dirname, '..', '..', '..', 'resources', 'skills.dictionary.json'),
+  ];
+
+  for (const dictionaryPath of candidatePaths) {
+    try {
+      return Object.freeze(
+        JSON.parse(fs.readFileSync(dictionaryPath, 'utf8')) as Record<string, string>,
+      );
+    } catch {
+      continue;
+    }
+  }
+
+  return FALLBACK_SKILL_DICTIONARY;
 }
