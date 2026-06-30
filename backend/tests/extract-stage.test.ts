@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { UnsupportedSourceError } from '../src/errors';
 import { ExtractorFactory } from '../src/extractors/base/extractor.factory';
 import type { IngestionSource } from '../src/extractors/base/extractor.types';
@@ -10,6 +10,28 @@ import { JsonParser } from '../src/parsers/json.parser';
 import { PdfParser } from '../src/parsers/pdf.parser';
 import { TextParser } from '../src/parsers/text.parser';
 import { ExtractStage } from '../src/pipeline/stages/extract.stage';
+
+const pdfParseMockState = vi.hoisted(() => ({
+  getText: vi.fn(),
+  destroy: vi.fn(),
+  constructorArgs: [] as unknown[],
+}));
+
+vi.mock('pdf-parse', () => ({
+  PDFParse: class {
+    constructor(options: unknown) {
+      pdfParseMockState.constructorArgs.push(options);
+    }
+
+    getText() {
+      return pdfParseMockState.getText();
+    }
+
+    destroy() {
+      return pdfParseMockState.destroy();
+    }
+  },
+}));
 
 function createSource(
   overrides: Partial<IngestionSource> & Pick<IngestionSource, 'fileName' | 'mimeType'>,
@@ -29,6 +51,13 @@ function createSource(
 }
 
 describe('Phase 3 extraction pipeline', () => {
+  beforeEach(() => {
+    pdfParseMockState.constructorArgs.length = 0;
+    pdfParseMockState.getText.mockReset();
+    pdfParseMockState.destroy.mockReset();
+    pdfParseMockState.destroy.mockResolvedValue(undefined);
+  });
+
   it('parser factory resolves the correct parser by source', () => {
     const factory = new ParserFactory();
 
@@ -126,6 +155,26 @@ describe('Phase 3 extraction pipeline', () => {
     );
 
     expect(parsed.text).toContain('Jane Doe');
+  });
+
+  it('pdf parser uses the installed PDFParse API shape', async () => {
+    const parser = new PdfParser();
+    pdfParseMockState.getText.mockResolvedValue({
+      text: 'Jane Doe\nTypeScript',
+    });
+
+    const parsed = await parser.parse(
+      createSource({
+        fileName: 'resume.pdf',
+        mimeType: 'application/pdf',
+        buffer: Buffer.from('%PDF-1.4 fake'),
+      }),
+    );
+
+    expect(parsed.text).toContain('Jane Doe');
+    expect(pdfParseMockState.constructorArgs).toHaveLength(1);
+    expect(pdfParseMockState.getText).toHaveBeenCalledTimes(1);
+    expect(pdfParseMockState.destroy).toHaveBeenCalledTimes(1);
   });
 
   it('extract stage processes resume and csv sources into partial candidates', async () => {

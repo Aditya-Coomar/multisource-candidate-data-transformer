@@ -12,6 +12,7 @@ import {
 } from '../../src/models';
 import { MissingFieldError } from '../../src/errors';
 import { ProjectionStage } from '../../src/pipeline/stages/projection.stage';
+import { transformResponseDataSchema } from '../../src/validators/response/transform.response';
 
 describe('ProjectionStage', () => {
   it('projects canonical candidates into runtime-configured output shapes', async () => {
@@ -195,5 +196,72 @@ describe('ProjectionStage', () => {
     await expect(
       new ProjectionStage().execute([candidate], config),
     ).rejects.toBeInstanceOf(MissingFieldError);
+  });
+
+  it('sanitizes undefined values from structured output so projected JSON stays valid', async () => {
+    const sourceRecord = createSourceRecord({
+      sourceId: 'resume-projection-3',
+      sourceType: 'resume',
+      sourceName: 'Resume Upload',
+      fileName: 'resume.pdf',
+      mimeType: 'application/pdf',
+      parser: 'PdfParser',
+      extractor: 'ResumeExtractor',
+    });
+    const candidate = createCanonicalCandidate({
+      fullName: 'Jane Doe',
+      skills: [
+        createSkill({ name: 'TypeScript' }),
+      ],
+      sourceRecords: [sourceRecord],
+    });
+    const config = createProjectionConfig({
+      fields: ['fullName', 'skills'],
+      includeSourceRecords: true,
+    });
+
+    const [projectedCandidate] = await new ProjectionStage().execute(
+      [candidate],
+      config,
+    );
+
+    expect(projectedCandidate).toEqual({
+      fullName: 'Jane Doe',
+      skills: [
+        {
+          id: expect.any(String),
+          name: 'TypeScript',
+          provenance: [],
+          confidence: [],
+        },
+      ],
+      sourceRecords: [
+        {
+          id: expect.any(String),
+          sourceId: 'resume-projection-3',
+          sourceType: 'resume',
+          sourceName: 'Resume Upload',
+          fileName: 'resume.pdf',
+          mimeType: 'application/pdf',
+          parser: 'PdfParser',
+          extractor: 'ResumeExtractor',
+          receivedAt: expect.any(String),
+          metadata: {},
+        },
+      ],
+    });
+
+    expect(() =>
+      transformResponseDataSchema.parse({
+        candidates: [projectedCandidate],
+        summary: {
+          sourceCount: 1,
+          partialCandidateCount: 1,
+          normalizedCandidateCount: 1,
+          canonicalCandidateCount: 1,
+          projectedCandidateCount: 1,
+        },
+      }),
+    ).not.toThrow();
   });
 });

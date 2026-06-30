@@ -1,13 +1,7 @@
-import pdfParse from 'pdf-parse';
+import { PDFParse } from 'pdf-parse';
 import { EmptyInputError, MalformedInputError, ParserError } from '../errors';
 import type { IngestionSource, ParsedTextContent } from '../extractors/base/extractor.types';
 import type { Parser } from './parser.interface';
-
-type PdfParseResult = {
-  text: string;
-};
-
-type PdfParseFunction = (input: Buffer) => Promise<PdfParseResult>;
 
 export class PdfParser implements Parser<ParsedTextContent> {
   public readonly name = 'PdfParser';
@@ -27,8 +21,11 @@ export class PdfParser implements Parser<ParsedTextContent> {
     }
 
     try {
-      const parsePdf = pdfParse as unknown as PdfParseFunction;
-      const result = await parsePdf(source.buffer);
+      const parser = new PDFParse({
+        data: new Uint8Array(source.buffer),
+      });
+      const result = await parser.getText();
+      await parser.destroy();
       const text = result.text.trim();
 
       if (!text) {

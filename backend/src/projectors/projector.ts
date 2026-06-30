@@ -102,7 +102,9 @@ export class ProjectionEngine
       projectedFieldCount: Object.keys(output).length,
     });
 
-    return Object.freeze(output);
+    return Object.freeze(
+      sanitizeForJson(output) as Readonly<Record<string, unknown>>,
+    );
   }
 
   private formatValue(
@@ -184,4 +186,46 @@ export class ProjectionEngine
 
     return JSON.stringify(value);
   }
+}
+
+function sanitizeForJson(value: unknown): unknown {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (value === null) {
+    return null;
+  }
+
+  if (
+    typeof value === 'string' ||
+    typeof value === 'number' ||
+    typeof value === 'boolean'
+  ) {
+    return value;
+  }
+
+  if (Array.isArray(value)) {
+    return Object.freeze(
+      value
+        .map((entry) => sanitizeForJson(entry))
+        .filter((entry) => entry !== undefined),
+    );
+  }
+
+  if (typeof value === 'object') {
+    const sanitized: Record<string, unknown> = {};
+
+    for (const [key, entry] of Object.entries(value)) {
+      const normalizedEntry = sanitizeForJson(entry);
+
+      if (normalizedEntry !== undefined) {
+        sanitized[key] = normalizedEntry;
+      }
+    }
+
+    return Object.freeze(sanitized);
+  }
+
+  return String(value);
 }
