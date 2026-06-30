@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import { config } from '../../config/config';
 import logger from '../../logger';
 import { CanonicalBuilder } from '../../mergers/builder/canonical.builder';
@@ -15,6 +16,19 @@ import { ExperienceMergeStrategy } from '../../mergers/strategies/experience.str
 import { ScalarMergeStrategy } from '../../mergers/strategies/scalar.strategy';
 import { SocialMergeStrategy } from '../../mergers/strategies/social.strategy';
 import type { CanonicalCandidate, NormalizedPartialCandidate } from '../../models';
+import type { LLMRuntimeContext } from '../../llm/runtime';
+
+const mergeAdvisorSchema = z
+  .object({
+    fieldPath: z.string().min(1),
+    chosenValue: z.string().min(1).optional(),
+    noSafeMerge: z.boolean().default(false),
+    conflictClass: z.string().min(1).default('ambiguous'),
+    rationale: z.string().optional(),
+    evidence: z.array(z.string()).default([]),
+    confidence: z.number().min(0).max(1).default(0.5),
+  })
+  .strict();
 
 export class MergeStage {
   private readonly mergeConfig: MergeConfig;
@@ -54,6 +68,7 @@ export class MergeStage {
 
   async execute(
     candidates: readonly NormalizedPartialCandidate[],
+    llmContext?: LLMRuntimeContext,
   ): Promise<readonly CanonicalCandidate[]> {
     logger.info('merge.started', {
       candidateCount: candidates.length,
@@ -68,6 +83,7 @@ export class MergeStage {
 
     for (const group of groups) {
       const mergePlan = this.mergePlanner.plan(group);
+      await this.reviewAmbiguousMergePlan(mergePlan, llmContext);
       const mergeContext = createMergeContext({
         currentGroup: group,
         mergePlan,
@@ -95,5 +111,39 @@ export class MergeStage {
     });
 
     return Object.freeze(canonicalCandidates);
+  }
+
+  private async reviewAmbiguousMergePlan(
+    mergePlan: ReturnType<MergePlanner['plan']>,
+    llmContext?: LLMRuntimeContext,
+  ): Promise<void> {
+    if (!llmContext?.isEnabledFor('merge')) {
+      return;
+    }
+
+    for (const fieldPath of ['headline', 'summary'] as const) {
+      const fieldPlan = mergePlan.fields[fieldPath];
+
+      if (!fieldPlan.hasConflict || fieldPlan.candidates.length < 2) {
+        continue;
+      }
+
+      const response = await llmContext.orchestrator.runJson({
+        stage: 'merge',
+        responseSchema: mergeAdvisorSchema,
+        input: fieldPlan,
+        prompt: [
+          'Review this merge conflict and decide whether there is a safe semantic merge.',
+          'Return noSafeMerge=true unless the decision is clearly grounded in the candidate values.',
+          JSON.stringify(fieldPlan),
+        ].join('\n\n'),
+      });
+
+      if (!response.ok) {
+        continue;
+      }
+
+      llmContext.recordDecision(response.envelope);
+    }
   }
 }

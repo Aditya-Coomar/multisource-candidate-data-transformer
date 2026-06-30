@@ -15,6 +15,8 @@ describe('Phase 8 validation engine and REST API layer', () => {
         appVersion: '1.0.0',
         confidencePipelineVersion: expect.any(String),
         projectionPipelineVersion: expect.any(String),
+        llmProvider: 'openrouter',
+        llmDefaultModel: 'google/gemini-2.5-flash',
       },
     });
   });

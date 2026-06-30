@@ -1,9 +1,10 @@
-import { NextFunction, Request, Response } from 'express';
+import { NextFunction, Response } from 'express';
 import logger from '../logger';
+import type { AppRequest } from '../types/http';
 import { redactHeaders } from '../utils/redaction';
 
 export function requestLogger(
-  req: Request,
+  req: AppRequest,
   res: Response,
   next: NextFunction,
 ): void {

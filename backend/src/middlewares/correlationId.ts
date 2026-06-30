@@ -1,11 +1,12 @@
 import { randomUUID } from 'node:crypto';
-import { NextFunction, Request, Response } from 'express';
+import { NextFunction, Response } from 'express';
+import type { AppRequest } from '../types/http';
 import { runWithRequestContext } from '../utils/requestContext';
 
 const CORRELATION_ID_HEADER = 'x-correlation-id';
 
 export function correlationIdMiddleware(
-  req: Request,
+  req: AppRequest,
   res: Response,
   next: NextFunction,
 ): void {

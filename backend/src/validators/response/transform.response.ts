@@ -1,4 +1,9 @@
 import { z } from 'zod';
+import {
+  llmDecisionEnvelopeSchema,
+  llmExplanationSchema,
+  semanticWarningSchema,
+} from '../../llm/contracts';
 import { ProjectionPlanner } from '../../projectors';
 import type { ProjectionConfig } from '../../models';
 import { RequestValidationError } from '../../errors';
@@ -27,6 +32,9 @@ export const transformResponseDataSchema = z.object({
       projectedCandidateCount: z.number().int().nonnegative(),
     })
     .strict(),
+  semanticWarnings: z.array(semanticWarningSchema).optional(),
+  llmDecisions: z.array(llmDecisionEnvelopeSchema).optional(),
+  explanations: z.array(llmExplanationSchema).optional(),
 });
 
 export function validateProjectedCandidates(

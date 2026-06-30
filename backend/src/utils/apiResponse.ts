@@ -1,7 +1,8 @@
-import type { Request, Response } from 'express';
+import type { Response } from 'express';
+import type { AppRequest } from '../types/http';
 
 export function sendSuccess<T>(
-  req: Request,
+  req: AppRequest,
   res: Response,
   data: T,
   statusCode = 200,
@@ -14,7 +15,7 @@ export function sendSuccess<T>(
   });
 }
 
-function getDurationMs(req: Request): number {
+function getDurationMs(req: AppRequest): number {
   if (!req.requestStartedAt) {
     return 0;
   }

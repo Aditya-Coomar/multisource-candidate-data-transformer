@@ -1,8 +1,9 @@
-import { NextFunction, Request, Response } from 'express';
+import { NextFunction, Response } from 'express';
 import multer, { type MulterError } from 'multer';
 import { ZodError } from 'zod';
 import { AppError, UploadError } from '../errors';
 import logger from '../logger';
+import type { AppRequest } from '../types/http';
 
 type ErrorResponse = {
   success: false;
@@ -16,7 +17,7 @@ type ErrorResponse = {
 
 export function errorHandler(
   error: Error,
-  req: Request,
+  req: AppRequest,
   res: Response<ErrorResponse>,
   next: NextFunction,
 ): void {
@@ -27,19 +28,19 @@ export function errorHandler(
       ? error
       : error instanceof multer.MulterError
         ? normalizeMulterError(error)
-      : error instanceof ZodError
-        ? new AppError('Validation failed.', {
-            statusCode: 400,
-            code: 'VALIDATION_ERROR',
-            details: error.flatten(),
-            cause: error,
-          })
-        : new AppError('Internal server error.', {
-            statusCode: 500,
-            code: 'INTERNAL_SERVER_ERROR',
-            cause: error,
-            isOperational: false,
-          });
+        : error instanceof ZodError
+          ? new AppError('Validation failed.', {
+              statusCode: 400,
+              code: 'VALIDATION_ERROR',
+              details: error.flatten(),
+              cause: error,
+            })
+          : new AppError('Internal server error.', {
+              statusCode: 500,
+              code: 'INTERNAL_SERVER_ERROR',
+              cause: error,
+              isOperational: false,
+            });
 
   logger.error('request.failed', {
     method: req.method,

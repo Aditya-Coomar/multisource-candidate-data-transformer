@@ -1,3 +1,5 @@
+import { createLlmRuntimeContext } from '../llm/runtime';
+import type { LLMPolicyInput } from '../llm/contracts';
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { config } from '../config/config';
@@ -16,6 +18,7 @@ import {
   MergeStage,
   NormalizeStage,
   ProjectionStage,
+  SemanticValidationStage,
 } from '../pipeline';
 import type { IngestionSource } from '../extractors/base/extractor.types';
 import { PipelineError } from '../errors';
@@ -24,6 +27,7 @@ type TransformInput = {
   readonly files: readonly UploadedFile[];
   readonly projectionConfig: unknown;
   readonly sourceDescriptors?: readonly SourceDescriptor[];
+  readonly llm?: LLMPolicyInput;
 };
 
 type TransformResult = {
@@ -35,6 +39,20 @@ type TransformResult = {
     readonly canonicalCandidateCount: number;
     readonly projectedCandidateCount: number;
   };
+  readonly semanticWarnings?: readonly {
+    readonly code: string;
+    readonly severity: 'info' | 'warn' | 'error';
+    readonly message: string;
+    readonly candidateIndex?: number;
+    readonly fieldPath?: string;
+  }[];
+  readonly llmDecisions?: readonly Readonly<Record<string, unknown>>[];
+  readonly explanations?: readonly {
+    readonly candidateId?: string;
+    readonly fieldPath: string;
+    readonly summary: string;
+    readonly supportingSources: readonly string[];
+  }[];
 };
 
 export class PipelineService {
@@ -43,6 +61,7 @@ export class PipelineService {
   private readonly mergeStage: MergeStage;
   private readonly confidenceStage: ConfidenceStage;
   private readonly projectionStage: ProjectionStage;
+  private readonly semanticValidationStage: SemanticValidationStage;
 
   constructor(
     extractStage = new ExtractStage(),
@@ -50,12 +69,14 @@ export class PipelineService {
     mergeStage = new MergeStage(),
     confidenceStage = new ConfidenceStage(),
     projectionStage = new ProjectionStage(),
+    semanticValidationStage = new SemanticValidationStage(),
   ) {
     this.extractStage = extractStage;
     this.normalizeStage = normalizeStage;
     this.mergeStage = mergeStage;
     this.confidenceStage = confidenceStage;
     this.projectionStage = projectionStage;
+    this.semanticValidationStage = semanticValidationStage;
   }
 
   async transform(input: TransformInput): Promise<TransformResult> {
@@ -70,17 +91,31 @@ export class PipelineService {
         sourceCount: sources.length,
       });
 
-      const partialCandidates = await this.extractStage.execute(sources);
-      const normalizedCandidates = await this.normalizeStage.execute(partialCandidates);
-      const canonicalCandidates = await this.mergeStage.execute(normalizedCandidates);
+      const llmContext = createLlmRuntimeContext(input.llm);
+      const partialCandidates = await this.extractStage.execute(sources, llmContext);
+      const normalizedCandidates = await this.normalizeStage.execute(
+        partialCandidates,
+        llmContext,
+      );
+      const canonicalCandidates = await this.mergeStage.execute(
+        normalizedCandidates,
+        llmContext,
+      );
       const enrichedCandidates = await this.confidenceStage.execute(
         canonicalCandidates,
         normalizedCandidates,
+        llmContext,
       );
       const projectedCandidates = await this.projectionStage.execute(
         enrichedCandidates,
         projectionConfig,
       );
+      await this.semanticValidationStage.execute(
+        enrichedCandidates,
+        projectedCandidates,
+        llmContext,
+      );
+      const llmArtifacts = llmContext.getArtifacts();
 
       validateProjectedCandidates(projectedCandidates, projectionConfig);
 
@@ -93,6 +128,15 @@ export class PipelineService {
           canonicalCandidateCount: canonicalCandidates.length,
           projectedCandidateCount: projectedCandidates.length,
         },
+        ...(llmArtifacts.warnings.length > 0 && {
+          semanticWarnings: llmArtifacts.warnings,
+        }),
+        ...(llmArtifacts.decisions.length > 0 && {
+          llmDecisions: llmArtifacts.decisions,
+        }),
+        ...(llmArtifacts.explanations.length > 0 && {
+          explanations: llmArtifacts.explanations,
+        }),
       } as const;
 
       transformResponseDataSchema.parse(result);
@@ -121,11 +165,13 @@ export class PipelineService {
   getVersion() {
     return {
       apiVersion: config.app.apiVersion,
-      appVersion: config.app.version,
-      confidencePipelineVersion: config.confidence.pipelineVersion,
-      projectionPipelineVersion: config.projection.pipelineVersion,
-      environment: config.env,
-    };
+        appVersion: config.app.version,
+        confidencePipelineVersion: config.confidence.pipelineVersion,
+        projectionPipelineVersion: config.projection.pipelineVersion,
+        llmProvider: 'openrouter',
+        llmDefaultModel: config.llm.model,
+        environment: config.env,
+      };
   }
 
   private mapFilesToSources(

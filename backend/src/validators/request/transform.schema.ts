@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { llmPolicySchema } from '../../llm/contracts';
 
 const sourceDescriptorSchema = z
   .object({
@@ -14,6 +15,7 @@ export const transformRequestSchema = z
   .object({
     projectionConfig: z.unknown(),
     sources: z.array(sourceDescriptorSchema).optional(),
+    llm: llmPolicySchema.optional(),
   })
   .strict();
 

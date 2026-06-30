@@ -1,11 +1,61 @@
+import { z } from 'zod';
 import logger from '../../logger';
 import { EmptyInputError, MalformedInputError, UnsupportedSourceError } from '../../errors';
 import { createPartialCandidate } from '../../models/partial-candidate';
+import { createEducation } from '../../models/education';
+import { createExperience } from '../../models/experience';
+import { createLocation } from '../../models/location';
 import { createSourceRecord } from '../../models/source-record';
+import { createSkill } from '../../models/skill';
 import { ExtractorFactory } from '../../extractors/base/extractor.factory';
 import type { IngestionSource } from '../../extractors/base/extractor.types';
 import type { PartialCandidate } from '../../models/partial-candidate';
 import { ParserFactory } from '../../parsers/parser.factory';
+import type { LLMRuntimeContext } from '../../llm/runtime';
+
+const extractionRefinementSchema = z
+  .object({
+    headline: z.string().min(1).optional(),
+    summary: z.string().min(1).optional(),
+    location: z
+      .object({
+        raw: z.string().min(1).optional(),
+        city: z.string().min(1).optional(),
+        region: z.string().min(1).optional(),
+        country: z.string().min(1).optional(),
+        postalCode: z.string().min(1).optional(),
+        formatted: z.string().min(1).optional(),
+      })
+      .optional(),
+    skills: z.array(z.string().min(1)).default([]),
+    experiences: z
+      .array(
+        z.object({
+          employer: z.string().min(1),
+          title: z.string().min(1).optional(),
+          description: z.string().min(1).optional(),
+          startDate: z.string().min(1).optional(),
+          endDate: z.string().min(1).optional(),
+          isCurrent: z.boolean().optional(),
+        }),
+      )
+      .default([]),
+    education: z
+      .array(
+        z.object({
+          institution: z.string().min(1),
+          degree: z.string().min(1).optional(),
+          fieldOfStudy: z.string().min(1).optional(),
+          startDate: z.string().min(1).optional(),
+          endDate: z.string().min(1).optional(),
+        }),
+      )
+      .default([]),
+    rationale: z.string().optional(),
+    evidence: z.array(z.string()).default([]),
+    confidence: z.number().min(0).max(1).default(0.5),
+  })
+  .strict();
 
 const BLOCKED_EXTENSIONS = new Set([
   '.exe',
@@ -54,7 +104,10 @@ export class ExtractStage {
     this.extractorFactory = extractorFactory;
   }
 
-  async execute(sources: readonly IngestionSource[]): Promise<readonly PartialCandidate[]> {
+  async execute(
+    sources: readonly IngestionSource[],
+    llmContext?: LLMRuntimeContext,
+  ): Promise<readonly PartialCandidate[]> {
     const partialCandidates: PartialCandidate[] = [];
 
     for (const source of sources) {
@@ -100,14 +153,17 @@ export class ExtractStage {
         },
       });
 
-      partialCandidates.push(
-        ...extractedCandidates.map((candidate) =>
+      for (const candidate of extractedCandidates) {
+        const enrichedCandidate = await this.applyLlmRefinement(
           createPartialCandidate({
             ...candidate,
             sourceRecords: [sourceRecord],
           }),
-        ),
-      );
+          parsedContent,
+          llmContext,
+        );
+        partialCandidates.push(enrichedCandidate);
+      }
 
       logger.info('extraction.finished', {
         sourceId: source.sourceId,
@@ -169,5 +225,79 @@ export class ExtractStage {
         source: source.fileName,
       });
     }
+  }
+
+  private async applyLlmRefinement(
+    candidate: PartialCandidate,
+    parsedContent: unknown,
+    llmContext?: LLMRuntimeContext,
+  ): Promise<PartialCandidate> {
+    if (!llmContext?.isEnabledFor('extraction')) {
+      return candidate;
+    }
+
+    const response = await llmContext.orchestrator.runJson({
+      stage: 'extraction',
+      responseSchema: extractionRefinementSchema,
+      input: {
+        candidate,
+        parsedContent,
+      },
+      prompt: [
+        'Enrich the extracted candidate using only grounded source evidence.',
+        'Prefer filling missing fields over changing existing ones.',
+        'Never invent companies, dates, degrees, locations, or skills.',
+        JSON.stringify({
+          candidate,
+          parsedContent,
+        }),
+      ].join('\n\n'),
+    });
+
+    if (!response.ok) {
+      return candidate;
+    }
+
+    llmContext.recordDecision(response.envelope);
+
+    return createPartialCandidate({
+      ...candidate,
+      headline: candidate.headline ?? response.data.headline,
+      summary: candidate.summary ?? response.data.summary,
+      location:
+        candidate.location ??
+        (response.data.location
+          ? createLocation(response.data.location)
+          : undefined),
+      skills:
+        candidate.skills.length > 0
+          ? candidate.skills
+          : response.data.skills.map((name) => createSkill({ name })),
+      experiences:
+        candidate.experiences.length > 0
+          ? candidate.experiences
+          : response.data.experiences.map((experience) =>
+              createExperience({
+                employer: experience.employer,
+                title: experience.title,
+                description: experience.description,
+                startDate: experience.startDate,
+                endDate: experience.endDate,
+                isCurrent: experience.isCurrent ?? false,
+              }),
+            ),
+      education:
+        candidate.education.length > 0
+          ? candidate.education
+          : response.data.education.map((entry) =>
+              createEducation({
+                institution: entry.institution,
+                degree: entry.degree,
+                fieldOfStudy: entry.fieldOfStudy,
+                startDate: entry.startDate,
+                endDate: entry.endDate,
+              }),
+            ),
+    });
   }
 }

@@ -1,7 +1,14 @@
 import path from 'node:path';
-import multer, { type FileFilterCallback, type MulterFile } from 'multer';
+import multer from 'multer';
 import { config } from './config';
 import { UploadError } from '../errors';
+
+type FileFilterFile = {
+  originalname: string;
+  mimetype: string;
+};
+
+type FileFilterCallback = (error: Error | null, acceptFile?: boolean) => void;
 
 const ALLOWED_EXTENSIONS = new Set(['.pdf', '.docx', '.txt', '.csv', '.json']);
 const ALLOWED_MIME_TYPES = new Set([
@@ -37,7 +44,7 @@ export const uploadMiddleware = multer({
   },
   fileFilter: (
     _req: unknown,
-    file: MulterFile,
+    file: FileFilterFile,
     callback: FileFilterCallback,
   ) => {
     const originalName = sanitizeFileName(file.originalname);

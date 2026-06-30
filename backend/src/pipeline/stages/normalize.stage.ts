@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import logger from '../../logger';
 import { NormalizationError, UnsupportedNormalizationError } from '../../errors';
 import { createContactInfo } from '../../models/contact-info';
@@ -17,6 +18,18 @@ import type { PartialCandidate } from '../../models/partial-candidate';
 import type { Skill } from '../../models/skill';
 import type { SocialLink } from '../../models/social-link';
 import { NormalizerRegistry } from '../../normalizers/base/normalizer.registry';
+import type { LLMRuntimeContext } from '../../llm/runtime';
+
+const semanticNormalizationSchema = z
+  .object({
+    headline: z.string().min(1).optional(),
+    employerAliases: z.record(z.string(), z.string()).default({}),
+    skillAliases: z.record(z.string(), z.string()).default({}),
+    rationale: z.string().optional(),
+    evidence: z.array(z.string()).default([]),
+    confidence: z.number().min(0).max(1).default(0.5),
+  })
+  .strict();
 
 type NormalizationAttempt = {
   value: string;
@@ -32,14 +45,19 @@ export class NormalizeStage {
 
   async execute(
     candidates: readonly PartialCandidate[],
+    llmContext?: LLMRuntimeContext,
   ): Promise<readonly NormalizedPartialCandidate[]> {
     logger.info('normalization.started', {
       candidateCount: candidates.length,
     });
 
-    const normalizedCandidates = candidates.map((candidate) =>
-      this.normalizeCandidate(candidate),
-    );
+    const normalizedCandidates: NormalizedPartialCandidate[] = [];
+
+    for (const candidate of candidates) {
+      normalizedCandidates.push(
+        await this.normalizeCandidate(candidate, llmContext),
+      );
+    }
 
     logger.info('normalization.finished', {
       candidateCount: normalizedCandidates.length,
@@ -50,7 +68,8 @@ export class NormalizeStage {
 
   private normalizeCandidate(
     candidate: PartialCandidate,
-  ): NormalizedPartialCandidate {
+    llmContext?: LLMRuntimeContext,
+  ): Promise<NormalizedPartialCandidate> | NormalizedPartialCandidate {
     const operations: NormalizationOperation[] = [];
 
     const location = candidate.location
@@ -81,7 +100,7 @@ export class NormalizeStage {
       this.normalizeEducation(entry, operations),
     );
 
-    return createNormalizedPartialCandidate({
+    const normalizedCandidate = createNormalizedPartialCandidate({
       sourceRecords: candidate.sourceRecords,
       firstName: this.normalizeFreeText(candidate.firstName),
       middleName: this.normalizeFreeText(candidate.middleName),
@@ -99,6 +118,12 @@ export class NormalizeStage {
       additionalData: candidate.additionalData,
       normalizationOperations: operations,
     });
+
+    return this.applySemanticNormalization(
+      normalizedCandidate,
+      operations,
+      llmContext,
+    );
   }
 
   private normalizeContactInfo(
@@ -327,6 +352,83 @@ export class NormalizeStage {
       .trim()
       .replace(/\s+/g, ' ');
     return normalized || undefined;
+  }
+
+  private async applySemanticNormalization(
+    candidate: NormalizedPartialCandidate,
+    operations: NormalizationOperation[],
+    llmContext?: LLMRuntimeContext,
+  ): Promise<NormalizedPartialCandidate> {
+    if (!llmContext?.isEnabledFor('normalization')) {
+      return candidate;
+    }
+
+    const response = await llmContext.orchestrator.runJson({
+      stage: 'normalization',
+      responseSchema: semanticNormalizationSchema,
+      input: candidate,
+      prompt: [
+        'Normalize ambiguous candidate semantics without inventing unsupported values.',
+        'Only canonicalize titles, company names, and skills when the mapping is strongly grounded in the input.',
+        JSON.stringify(candidate),
+      ].join('\n\n'),
+    });
+
+    if (!response.ok) {
+      return candidate;
+    }
+
+    llmContext.recordDecision(response.envelope);
+
+    const normalizedSkills = candidate.skills.map((skill) => {
+      const canonical = response.data.skillAliases[skill.name];
+
+      if (!canonical || canonical.trim().length === 0) {
+        return skill;
+      }
+
+      operations.push({
+        field: 'skill.name',
+        normalizer: 'LLMSemanticNormalizer',
+        originalValue: skill.name,
+        normalizedValue: canonical,
+        timestamp: new Date().toISOString(),
+      });
+
+      return createSkill({
+        ...skill,
+        name: canonical,
+      });
+    });
+
+    const normalizedExperiences = candidate.experiences.map((experience) => {
+      const canonicalEmployer = response.data.employerAliases[experience.employer];
+
+      if (!canonicalEmployer || canonicalEmployer.trim().length === 0) {
+        return experience;
+      }
+
+      operations.push({
+        field: 'experience.employer',
+        normalizer: 'LLMSemanticNormalizer',
+        originalValue: experience.employer,
+        normalizedValue: canonicalEmployer,
+        timestamp: new Date().toISOString(),
+      });
+
+      return createExperience({
+        ...experience,
+        employer: canonicalEmployer,
+      });
+    });
+
+    return createNormalizedPartialCandidate({
+      ...candidate,
+      headline: response.data.headline ?? candidate.headline,
+      skills: normalizedSkills,
+      experiences: normalizedExperiences,
+      normalizationOperations: operations,
+    });
   }
 
   private deduplicateStrings(values: readonly string[]): readonly string[] {

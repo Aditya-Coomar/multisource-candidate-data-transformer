@@ -1,5 +1,6 @@
-import type { Request, Response, NextFunction } from 'express';
+import type { Response, NextFunction } from 'express';
 import { PipelineService } from '../services/pipeline.service';
+import type { AppRequest } from '../types/http';
 import type { UploadedFile } from '../types/upload';
 import { sendSuccess } from '../utils/apiResponse';
 import { createOpenApiDocument } from '../validators/response/openapi.document';
@@ -7,7 +8,7 @@ import { createOpenApiDocument } from '../validators/response/openapi.document';
 const pipelineService = new PipelineService();
 
 export async function transformCandidates(
-  req: Request,
+  req: AppRequest,
   res: Response,
   next: NextFunction,
 ): Promise<void> {
@@ -16,6 +17,7 @@ export async function transformCandidates(
       files: (Array.isArray(req.files) ? req.files : []) as UploadedFile[],
       projectionConfig: req.body.projectionConfig,
       sourceDescriptors: req.body.sources,
+      llm: req.body.llm,
     });
 
     sendSuccess(req, res, result);
@@ -25,7 +27,7 @@ export async function transformCandidates(
 }
 
 export function validateProjectionConfigController(
-  req: Request,
+  req: AppRequest,
   res: Response,
 ): void {
   const projectionConfig = pipelineService.validateProjectionConfig(
@@ -39,21 +41,21 @@ export function validateProjectionConfigController(
 }
 
 export function getVersion(
-  req: Request,
+  req: AppRequest,
   res: Response,
 ): void {
   sendSuccess(req, res, pipelineService.getVersion());
 }
 
 export function getOpenApiDocument(
-  _req: Request,
+  _req: AppRequest,
   res: Response,
 ): void {
   res.status(200).json(createOpenApiDocument());
 }
 
 export function getDocsPage(
-  _req: Request,
+  _req: AppRequest,
   res: Response,
 ): void {
   res.status(200).type('html').send(`<!DOCTYPE html>
