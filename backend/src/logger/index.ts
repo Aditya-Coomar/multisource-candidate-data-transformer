@@ -1,11 +1,6 @@
-import fs from 'node:fs';
-import path from 'node:path';
 import winston from 'winston';
 import { config } from '../config/config';
 import { getCorrelationId } from '../utils/requestContext';
-
-const logDirectory = path.resolve(process.cwd(), 'logs');
-fs.mkdirSync(logDirectory, { recursive: true });
 
 const attachRequestContext = winston.format((info) => {
   const correlationId = getCorrelationId();
@@ -33,13 +28,6 @@ const logger = winston.createLogger({
   format: jsonFormat,
   transports: [
     new winston.transports.Console(),
-    new winston.transports.File({
-      filename: path.join(logDirectory, 'combined.log'),
-    }),
-    new winston.transports.File({
-      filename: path.join(logDirectory, 'error.log'),
-      level: 'error',
-    }),
   ],
 });
 
