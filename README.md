@@ -17,6 +17,25 @@ For the demo flow:
 3. Optionally load or paste a custom projection config to rename, select, or normalize fields.
 4. Review the output in the structured view, raw JSON view, and diagnostics view.
 
+## Sample Inputs And Outputs
+
+### Case 1: Default Schema From Resume
+
+<img width="543" height="407" alt="image" src="https://github.com/user-attachments/assets/06cc141e-eb3b-40e5-9833-9cecd61eee9d" />
+
+
+### Case 2: Custom Projection Config
+
+<img width="542" height="407" alt="image" src="https://github.com/user-attachments/assets/43c5853d-f580-46a5-a265-4f6f60af9802" />
+
+
+### Case 3: Structured CSV with Multiple Candidates
+
+| <img width="542" height="407" alt="image" src="https://github.com/user-attachments/assets/73dc238b-e6d1-4de5-adf4-fe231d05fd1d" /> | <img width="619" height="311" alt="image" src="https://github.com/user-attachments/assets/8b5087d1-9c37-4379-97b5-692bf7971abc" /> |
+|---|---|
+
+
+
 ## What Makes This Pipeline Different
 
 This is not only a resume parser. It is a multi-source ATS transformer with a canonical-first architecture:
@@ -316,39 +335,6 @@ The Docker image includes the required `resources/` directory for skill normaliz
 8. Paste malformed JSON into the projection config and run again.
 9. Show that the system falls back to the default schema instead of failing.
 
-## Sample Inputs And Outputs
-
-Add demo screenshots to `docs/images/` using the filenames below. The image references are already wired here, so the README will display them as soon as the files are added.
-
-### Case 1: Default Schema From Resume
-
-Input:
-
-![Case 1 input - resume upload with empty projection config](docs/images/case-1-default-schema-input.png)
-
-Output:
-
-![Case 1 output - default assignment schema response](docs/images/case-1-default-schema-output.png)
-
-### Case 2: Custom Projection Config
-
-Input:
-
-![Case 2 input - custom projection config](docs/images/case-2-custom-config-input.png)
-
-Output:
-
-![Case 2 output - renamed and projected response fields](docs/images/case-2-custom-config-output.png)
-
-### Case 3: Malformed Config Fallback
-
-Input:
-
-![Case 3 input - malformed projection config](docs/images/case-3-malformed-config-input.png)
-
-Output:
-
-![Case 3 output - fallback to default schema](docs/images/case-3-malformed-config-output.png)
 
 ## Notes For Deployment
 
